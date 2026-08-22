@@ -2,6 +2,12 @@
 
 **Deploy it. Prove it. Leave a pawprint.**
 
+> **Independent community project.** This repository is not a Microsoft product,
+> assessment, endorsement, or official deployment guidance. Some contributors may
+> be Microsoft employees acting in an individual or community capacity. Use at
+> your own risk and validate all deployments, evidence, and recommendations
+> before using them in any environment. See [DISCLAIMER.md](DISCLAIMER.md).
+
 Pawprint is an open platform for reproducible cloud scenarios on Azure. It deploys
 a known state, proves your tooling detected it, remediates, and proves the
 detection cleared — emitting a portable evidence artifact for every run.
@@ -9,7 +15,7 @@ detection cleared — emitting a portable evidence artifact for every run.
 That artifact is a **pawprint**: a signed, diffable, shareable record of what was
 deployed, what was asserted, and what was observed.
 
-```
+```text
 provision → arm → detect → remediate → verify → destroy
      └──────────── every stage recorded in the pawprint ────────────┘
 ```
@@ -125,6 +131,7 @@ closed. Details in [docs/CONNECTORS.md](docs/CONNECTORS.md).
 ## Documentation
 
 - [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
+- [Infrastructure as code](docs/IAC.md) — why Bicep, why no state file, linting and what-if
 - [Connectors](docs/CONNECTORS.md) — environments, permission tiers, capability matrix
 - [Identity](docs/IDENTITY.md) — tenants, auth modes, GitHub, and the tradeoffs
 - [Reversibility](docs/REVERSIBILITY.md) — what is touched, what undoes, what does not

@@ -1,5 +1,7 @@
 metadata description = 'Linux container on App Service, pulling from a registry with a user-assigned managed identity. Generalised from the Cloud Security Dojo scenario: the Azure Container Registry is optional so scenarios can pull public images from GHCR instead, and application settings are supplied by the caller rather than hardcoded.'
 
+import { pawprintTags, appSettings as appSettingsType } from '../types.bicep'
+
 @description('Azure region.')
 param location string = resourceGroup().location
 
@@ -13,7 +15,7 @@ param appServicePlanName string = '${appServiceName}-plan'
 param appServicePlanSku string = 'B1'
 
 @description('Tags applied to every resource in this module.')
-param tags object = {}
+param tags pawprintTags
 
 @description('Provision an Azure Container Registry. Set false to pull from a public registry such as GHCR, which avoids the registry cost and provisioning time.')
 param deployContainerRegistry bool = true
@@ -37,7 +39,7 @@ param containerPort int = 80
 param healthCheckPath string = '/health'
 
 @description('Application settings supplied by the caller. Scenario-specific values belong in the scenario manifest, never hardcoded here.')
-param appSettings object = {}
+param appSettings appSettingsType = {}
 
 var registryName = replace(containerRegistryName, '-', '')
 var identityName = '${appServiceName}-identity'
@@ -71,7 +73,7 @@ var imageReference = deployContainerRegistry
   ? '${containerRegistry!.properties.loginServer}/${imageName}:${imageTag}'
   : externalImageReference
 
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = if (deployContainerRegistry) {
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-11-01' = if (deployContainerRegistry) {
   name: registryName
   location: location
   tags: union(tags, { component: 'registry' })
@@ -85,7 +87,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
 }
 
-resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: identityName
   location: location
   tags: union(tags, { component: 'identity' })
@@ -103,7 +105,7 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (depl
   }
 }
 
-resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: appServicePlanName
   location: location
   tags: union(tags, { component: 'plan' })
@@ -117,7 +119,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   }
 }
 
-resource appService 'Microsoft.Web/sites@2023-01-01' = {
+resource appService 'Microsoft.Web/sites@2025-03-01' = {
   name: appServiceName
   location: location
   tags: union(tags, { component: 'web' })

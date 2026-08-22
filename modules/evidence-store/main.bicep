@@ -1,5 +1,7 @@
 metadata description = 'Durable evidence store for pawprints. Write-once semantics are the point: a time-based immutability policy means a written pawprint cannot be altered or deleted before it expires, which is what separates evidence from a log.'
 
+import { pawprintTags } from '../types.bicep'
+
 @description('Azure region.')
 param location string = resourceGroup().location
 
@@ -12,7 +14,7 @@ param accountName string
 param containerName string = 'pawprints'
 
 @description('Tags applied to every resource in this module.')
-param tags object = {}
+param tags pawprintTags
 
 @description('Apply a time-based immutability policy to the container.')
 param immutable bool = true
@@ -36,7 +38,7 @@ param skuName string = 'Standard_ZRS'
 var blobContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var blobReaderRoleId = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
   name: accountName
   location: location
   tags: union(tags, { component: 'evidence-store' })
@@ -60,7 +62,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2025-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -76,7 +78,7 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
   }
 }
 
-resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
   parent: blobService
   name: containerName
   properties: {
@@ -90,7 +92,7 @@ resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@20
 // Left unlocked so an operator can correct a misconfigured window. Lock it
 // manually once the retention period is confirmed; a locked policy cannot be
 // shortened or removed.
-resource immutabilityPolicy 'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies@2023-05-01' = if (immutable) {
+resource immutabilityPolicy 'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies@2025-01-01' = if (immutable) {
   parent: container
   name: 'default'
   properties: {

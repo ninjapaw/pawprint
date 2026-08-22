@@ -1,5 +1,7 @@
 metadata description = 'Log Analytics workspace and Application Insights, linked. Cost is bounded by a daily ingestion cap and sampling, because scenario runs are ephemeral and should never generate an open-ended telemetry bill.'
 
+import { pawprintTags } from '../types.bicep'
+
 @description('Azure region.')
 param location string = resourceGroup().location
 
@@ -10,7 +12,7 @@ param workspaceName string
 param applicationInsightsName string
 
 @description('Tags applied to every resource in this module.')
-param tags object = {}
+param tags pawprintTags
 
 @description('Retention in days.')
 @minValue(30)
@@ -27,7 +29,7 @@ param samplingPercentage int = 100
 
 var moduleTags = union(tags, { component: 'monitoring' })
 
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: workspaceName
   location: location
   tags: moduleTags

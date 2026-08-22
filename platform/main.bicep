@@ -2,6 +2,8 @@ metadata description = 'Subscription-scope platform baseline: the run resource g
 
 targetScope = 'subscription'
 
+import { pawprintTags as pawprintTagsType } from '../modules/types.bicep'
+
 @description('Resource group that will hold everything this run creates. One group per run is the blast-radius boundary.')
 param resourceGroupName string
 
@@ -26,7 +28,7 @@ param ttlHours int = 8
 param deployMonitoring bool = true
 
 @description('Additional tags merged over the Pawprint schema.')
-param additionalTags object = {}
+param additionalTags { *: string } = {}
 
 @description('Run start time. Leave at the default; it exists so expiry can be computed at deployment time.')
 param runTimestamp string = utcNow()
@@ -48,7 +50,7 @@ var pawprintTags = union(
   additionalTags
 )
 
-resource runResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+resource runResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: resourceGroupName
   location: location
   tags: pawprintTags
@@ -56,7 +58,6 @@ resource runResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
 
 module monitoring '../modules/monitoring/main.bicep' = if (deployMonitoring) {
   scope: runResourceGroup
-  name: 'pawprint-monitoring'
   params: {
     location: location
     workspaceName: 'log-${take(replace(resourceGroupName, '_', '-'), 55)}'
@@ -72,10 +73,10 @@ output resourceGroupName string = runResourceGroup.name
 output resourceGroupId string = runResourceGroup.id
 
 @description('Tag set the scenario must apply to its own resources.')
-output tags object = pawprintTags
+output tags pawprintTagsType = pawprintTags
 
 @description('Instant at which this run expires and its resources become eligible for reaping.')
 output expiresAt string = expiresAt
 
 @description('Log Analytics workspace id, empty when monitoring was not deployed.')
-output logAnalyticsWorkspaceId string = deployMonitoring ? monitoring!.outputs.workspaceId : ''
+output logAnalyticsWorkspaceId string = monitoring.?outputs.workspaceId ?? ''

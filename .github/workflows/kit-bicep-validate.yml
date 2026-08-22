@@ -20,12 +20,37 @@ on:
           compiled output of <name>.bicep.
         type: boolean
         default: true
+      fail-on-lint-warning:
+        description: >-
+          Treat Bicep linter warnings as failures. Stale API versions and unused
+          parameters are cheap to fix now and expensive to discover later.
+        type: boolean
+        default: true
+      what-if:
+        description: >-
+          Run a deployment what-if and post the predicted delta. Requires an
+          environment supplying OIDC identity variables.
+        type: boolean
+        default: false
+      environment:
+        description: GitHub Environment supplying OIDC identity variables, required when what-if is true.
+        type: string
+        default: ""
+      what-if-template:
+        description: Subscription-scope template to evaluate.
+        type: string
+        default: platform/main.bicep
+      what-if-parameters:
+        description: Parameter file for the what-if evaluation.
+        type: string
+        default: platform/main.dev.bicepparam
       working-directory:
         type: string
         default: "."
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   validate:
@@ -51,7 +76,15 @@ jobs:
           failed=0
           for file in "${files[@]}"; do
             echo "compiling $file"
-            az bicep build --file "$file" --outfile /dev/null || failed=1
+            log="$(mktemp)"
+            az bicep build --file "$file" --outfile /dev/null 2> "$log" || failed=1
+            # Info lines report which bicepconfig.json was picked up and are not findings.
+            if grep -E ': (Warning|Error) ' "$log"; then
+              if [ "${{ inputs.fail-on-lint-warning }}" = "true" ]; then
+                echo "::error file=$file::Bicep linter reported findings."
+                failed=1
+              fi
+            fi
           done
           exit $failed
 
@@ -80,3 +113,48 @@ jobs:
             echo "${#drifted[@]} committed ARM template(s) drifted from source."
             exit 1
           fi
+
+  what-if:
+    name: Predicted deployment delta
+    if: ${{ inputs.what-if }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # what-if is the safety net a reviewer actually reads: it shows the change
+      # in Azure terms rather than as a template diff.
+      - name: What-if
+        env:
+          PAWPRINT_RUN_ID: whatif-${{ github.run_id }}
+          PAWPRINT_RESOURCE_GROUP: ${{ vars.PAWPRINT_RESOURCE_GROUP }}
+          PAWPRINT_LOCATION: ${{ vars.PAWPRINT_LOCATION }}
+        run: |
+          set -euo pipefail
+          az deployment sub what-if \
+            --location "${PAWPRINT_LOCATION:-centralus}" \
+            --template-file "${{ inputs.what-if-template }}" \
+            --parameters "${{ inputs.what-if-parameters }}" \
+            --result-format FullResourcePayloads \
+            | tee what-if.txt
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "### Predicted deployment delta"
+            echo ""
+            echo '```'
+            head -c 60000 what-if.txt || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
