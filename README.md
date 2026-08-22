@@ -25,10 +25,33 @@ the primary artifact and the deployment as the means of producing it.
 | Component | Purpose |
 |---|---|
 | `schema/` | The pawprint, scenario, and deployment-config contracts |
-| `kit/` | Reusable GitHub Actions workflows, pinned by consumers at `@v1` |
-| `modules/` | Shared Bicep modules, AVM-first |
-| `scripts/` | Config resolver, OIDC bootstrap, preflight doctor |
-| `viewer/` | Zero-backend static site that renders pawprints |
+| `.github/workflows/kit-*.yml` | Reusable workflows, pinned by consumers at `@v1` |
+| `platform/` | Subscription-scope baseline: run resource group, tag schema, TTL stamp |
+| `modules/` | Shared Bicep modules |
+| `scripts/` | Config resolver, scenario validator, policy and guardrail tests |
+| `samples/` | Reference pawprint and scenario fixtures |
+
+## Quick start
+
+```bash
+npm ci
+npm test
+```
+
+```bash
+# Resolve configuration for an environment
+node scripts/pawprint-config.mjs --environment dev
+
+# Validate scenario manifests against schema and safety policy
+node scripts/validate-scenario.mjs "scenarios/**/scenario.json"
+```
+
+## Documentation
+
+- [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
+- [Configuration](docs/CONFIGURATION.md) — the five-layer model and its guardrails
+- [Scenario contract](docs/SCENARIO-CONTRACT.md) — authoring a scenario
+- [Contributing](CONTRIBUTING.md)
 
 ## Design rules
 
@@ -38,6 +61,7 @@ the primary artifact and the deployment as the means of producing it.
 4. **No long-lived credentials.** OIDC federation only.
 5. **Bounded by default.** Every scenario declares TTL, cost, and blast radius, and tears itself down.
 6. **The viewer stores nothing.** No accounts, no backend, no telemetry.
+7. **Guardrails are tested as negative cases.** One that never fires is worse than none.
 
 ## Status
 
