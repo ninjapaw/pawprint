@@ -15,8 +15,10 @@
   "scripts": {
     "config:check": "node scripts/pawprint-config.mjs --check --environment dev && node scripts/pawprint-config.mjs --check --environment prod",
     "schema:check": "node scripts/validate-schemas.mjs",
+    "scenario:check": "node scripts/validate-scenario.mjs samples/*.scenario.json",
     "test:guardrails": "node scripts/test-guardrails.mjs",
-    "test": "npm run schema:check && npm run config:check && npm run test:guardrails"
+    "test:policy": "node scripts/test-scenario-policy.mjs",
+    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

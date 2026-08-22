@@ -1,0 +1,78 @@
+name: Kit / Scenario validate
+
+# Reusable. Consumers pin a tag:
+#   uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@v1
+#
+# Validates every scenario manifest in the calling repository against the
+# Pawprint scenario schema and the catalog safety policy: bounded lifetime,
+# declared blast radius, justified public ingress, and evidence that is
+# observed from the running system rather than assumed from configuration.
+
+on:
+  workflow_call:
+    inputs:
+      scenario-glob:
+        description: Glob matching scenario manifests in the calling repository.
+        type: string
+        default: "scenarios/**/scenario.json"
+      pawprint-ref:
+        description: Tag, branch or SHA of ninjapaw/pawprint supplying the schema and validator.
+        type: string
+        default: v1
+      require-at-least-one:
+        description: Fail when the glob matches no scenarios, rather than passing vacuously.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Schema and safety policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the calling repository
+        uses: actions/checkout@v4
+        with:
+          path: consumer
+
+      - name: Check out Pawprint
+        uses: actions/checkout@v4
+        with:
+          repository: ninjapaw/pawprint
+          ref: ${{ inputs.pawprint-ref }}
+          path: pawprint
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: pawprint/package-lock.json
+
+      - name: Install validator dependencies
+        working-directory: pawprint
+        run: npm ci
+
+      - name: Validate scenarios
+        run: |
+          shopt -s nullglob globstar
+          cd consumer
+          files=(${{ inputs.scenario-glob }})
+          cd ..
+
+          if [ ${#files[@]} -eq 0 ]; then
+            if [ "${{ inputs.require-at-least-one }}" = "true" ]; then
+              echo "::error::No scenario manifests matched '${{ inputs.scenario-glob }}'."
+              exit 1
+            fi
+            echo "::warning::No scenario manifests matched; nothing to validate."
+            exit 0
+          fi
+
+          prefixed=()
+          for file in "${files[@]}"; do
+            prefixed+=("consumer/$file")
+          done
+
+          node pawprint/scripts/validate-scenario.mjs "${prefixed[@]}"

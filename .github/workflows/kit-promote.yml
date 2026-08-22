@@ -1,0 +1,137 @@
+name: Kit / Promote dev to main
+
+# Reusable. Consumers pin a tag:
+#   uses: ninjapaw/pawprint/.github/workflows/kit-promote.yml@v1
+#
+# Opens or reuses a dev -> main promotion pull request. Refuses to promote a
+# branch whose CI has not passed, so a broken dev never reaches production
+# review. Idempotent: re-running updates the existing PR rather than opening
+# a second one.
+
+on:
+  workflow_call:
+    inputs:
+      source-branch:
+        type: string
+        default: dev
+      target-branch:
+        type: string
+        default: main
+      require-ci:
+        description: Refuse to open the promotion PR unless the latest CI run on the source branch succeeded.
+        type: boolean
+        default: true
+      ci-workflow:
+        description: Workflow file name whose result gates the promotion.
+        type: string
+        default: ci.yml
+      pr-title:
+        type: string
+        default: ""
+    outputs:
+      pull-request-url:
+        description: URL of the promotion pull request.
+        value: ${{ jobs.promote.outputs.pull-request-url }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Open promotion pull request
+    runs-on: ubuntu-latest
+    outputs:
+      pull-request-url: ${{ steps.open.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the workflow was dispatched from the source branch
+        run: |
+          if [ "${{ github.ref_name }}" != "${{ inputs.source-branch }}" ]; then
+            echo "::error::Run this from '${{ inputs.source-branch }}', not '${{ github.ref_name }}'."
+            exit 1
+          fi
+
+      - name: Compare branches
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin "${{ inputs.target-branch }}" "${{ inputs.source-branch }}"
+          ahead="$(git rev-list --count "origin/${{ inputs.target-branch }}..origin/${{ inputs.source-branch }}")"
+          head_sha="$(git rev-parse "origin/${{ inputs.source-branch }}")"
+          echo "ahead=$ahead" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
+          if [ "$ahead" -eq 0 ]; then
+            echo "::notice::${{ inputs.source-branch }} has nothing to promote."
+          fi
+          echo "$ahead commit(s) ahead of ${{ inputs.target-branch }}."
+
+      - name: Stop when there is nothing to promote
+        if: steps.compare.outputs.ahead == '0'
+        run: |
+          echo "Nothing to promote."
+          exit 0
+
+      - name: Require a passing CI run on the source branch
+        if: ${{ inputs.require-ci && steps.compare.outputs.ahead != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion="$(gh run list \
+            --branch "${{ inputs.source-branch }}" \
+            --workflow "${{ inputs.ci-workflow }}" \
+            --limit 1 --json conclusion --jq '.[0].conclusion // "none"')"
+          echo "Latest ${{ inputs.ci-workflow }} conclusion on ${{ inputs.source-branch }}: $conclusion"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI on ${{ inputs.source-branch }} is '$conclusion'. Fix it before promoting."
+            exit 1
+          fi
+
+      - name: Open or reuse the promotion pull request
+        id: open
+        if: steps.compare.outputs.ahead != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing="$(gh pr list \
+            --base "${{ inputs.target-branch }}" \
+            --head "${{ inputs.source-branch }}" \
+            --state open --limit 1 --json url --jq '.[0].url // ""')"
+
+          title="${{ inputs.pr-title }}"
+          if [ -z "$title" ]; then
+            title="Promote ${{ inputs.source-branch }} to ${{ inputs.target-branch }}"
+          fi
+
+          body=$(cat <<'BODY'
+Automated promotion pull request.
+
+### Promotion checklist
+- [ ] CI passed on the source branch
+- [ ] Infrastructure what-if reviewed for unintended changes
+- [ ] Configuration or variable changes reviewed, including impact tier
+- [ ] Rollback path understood
+
+BODY
+)
+          body="${body}
+Commits ahead: ${{ steps.compare.outputs.ahead }}
+Source head: ${{ steps.compare.outputs.head-sha }}"
+
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "$title" --body "$body"
+            echo "url=$existing" >> "$GITHUB_OUTPUT"
+            echo "::notice::Updated existing promotion PR: $existing"
+          else
+            url="$(gh pr create \
+              --base "${{ inputs.target-branch }}" \
+              --head "${{ inputs.source-branch }}" \
+              --title "$title" \
+              --body "$body")"
+            echo "url=$url" >> "$GITHUB_OUTPUT"
+            echo "::notice::Opened promotion PR: $url"
+          fi

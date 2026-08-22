@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Schemas, config and guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validate schemas and sample fixtures
+        run: npm run schema:check
+
+      - name: Validate shipped configuration
+        run: npm run config:check
+
+      - name: Validate sample scenarios against schema and safety policy
+        run: npm run scenario:check
+
+      - name: Assert configuration guardrails reject bad input
+        run: npm run test:guardrails
+
+      - name: Assert scenario safety policies reject unsafe manifests
+        run: npm run test:policy
+
+  shell:
+    name: Shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check bash syntax
+        run: |
+          shopt -s nullglob globstar
+          files=(scripts/**/*.sh)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No shell scripts to check."
+            exit 0
+          fi
+          for file in "${files[@]}"; do
+            echo "checking $file"
+            bash -n "$file"
+          done
+
+  bicep:
+    name: Bicep modules compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile every Bicep module
+        run: |
+          shopt -s nullglob globstar
+          files=(modules/**/*.bicep)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Bicep modules to compile."
+            exit 0
+          fi
+          az bicep install
+          failed=0
+          for file in "${files[@]}"; do
+            echo "compiling $file"
+            az bicep build --file "$file" --outfile /dev/null || failed=1
+          done
+          exit $failed

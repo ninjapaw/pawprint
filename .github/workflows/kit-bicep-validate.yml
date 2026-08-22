@@ -1,0 +1,82 @@
+name: Kit / Bicep validate
+
+# Reusable. Consumers pin a tag:
+#   uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@v1
+#
+# Compiles every Bicep file and, where a compiled ARM template is committed
+# alongside it, proves the two are in sync. A committed artifact that is not
+# regenerated in the same pull request is not generated, it is a fork.
+
+on:
+  workflow_call:
+    inputs:
+      bicep-glob:
+        description: Glob of Bicep files to compile.
+        type: string
+        default: "infra/**/*.bicep"
+      check-committed-arm:
+        description: >-
+          Fail when a committed <name>.json sibling differs from the freshly
+          compiled output of <name>.bicep.
+        type: boolean
+        default: true
+      working-directory:
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Compile and drift-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep
+        run: az bicep install
+
+      - name: Compile
+        run: |
+          shopt -s nullglob globstar
+          files=(${{ inputs.bicep-glob }})
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No Bicep files matched '${{ inputs.bicep-glob }}'."
+            exit 0
+          fi
+          failed=0
+          for file in "${files[@]}"; do
+            echo "compiling $file"
+            az bicep build --file "$file" --outfile /dev/null || failed=1
+          done
+          exit $failed
+
+      - name: Drift-check committed ARM templates
+        if: ${{ inputs.check-committed-arm }}
+        run: |
+          shopt -s nullglob globstar
+          files=(${{ inputs.bicep-glob }})
+          drifted=()
+          for file in "${files[@]}"; do
+            committed="${file%.bicep}.json"
+            [ -f "$committed" ] || continue
+            fresh="$(mktemp)"
+            az bicep build --file "$file" --outfile "$fresh"
+            # Compare semantically so key ordering and whitespace do not cause
+            # false positives; only real template differences fail the gate.
+            if ! diff <(jq -S . "$committed") <(jq -S . "$fresh") > /dev/null; then
+              drifted+=("$committed")
+              echo "::error file=$committed::$committed is out of sync with $file. Recompile and commit it."
+              diff <(jq -S . "$committed") <(jq -S . "$fresh") || true
+            else
+              echo "in sync: $committed"
+            fi
+          done
+          if [ ${#drifted[@]} -gt 0 ]; then
+            echo "${#drifted[@]} committed ARM template(s) drifted from source."
+            exit 1
+          fi
