@@ -199,13 +199,23 @@ function main() {
   let failed = 0;
 
   for (const object of ordered) {
-    const collection = GRAPH_COLLECTION[object.kind];
-    if (!collection) {
-      stdout.write(`   ${style.warn("skip")}  ${object.kind} ${object.id} (no known Graph collection)\n`);
+    // Federated credentials are addressed through their parent application.
+    const url =
+      object.kind === "federatedIdentityCredential"
+        ? object.parentId
+          ? `https://graph.microsoft.com/v1.0/applications/${object.parentId}/federatedIdentityCredentials/${object.id}`
+          : null
+        : GRAPH_COLLECTION[object.kind]
+          ? `https://graph.microsoft.com/v1.0/${GRAPH_COLLECTION[object.kind]}/${object.id}`
+          : null;
+
+    if (!url) {
+      stdout.write(`   ${style.warn("skip")}  ${object.kind} ${object.id} (no delete route recorded)\n`);
       continue;
     }
-    const result = graphDelete(`https://graph.microsoft.com/v1.0/${collection}/${object.id}`);
-    if (result === null && graphGet(`https://graph.microsoft.com/v1.0/${collection}/${object.id}`)) {
+
+    graphDelete(url);
+    if (graphGet(url)) {
       failed += 1;
       stdout.write(`   ${style.bad("fail")}  ${object.kind} ${object.id} still present\n`);
       continue;

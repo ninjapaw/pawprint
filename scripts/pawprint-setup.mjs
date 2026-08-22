@@ -157,6 +157,88 @@ function writeInstallManifest({ tenantId, operator }) {
   return manifest;
 }
 
+const GH_BIN = NEEDS_SHELL ? "gh.exe" : "gh";
+
+function gh(args, { allowFailure = true, input } = {}) {
+  assertSafeArgs(args.filter((arg) => !arg.startsWith("{")));
+  const result = spawnSync(GH_BIN, args, { encoding: "utf8", shell: NEEDS_SHELL, input });
+  if (result.status !== 0) {
+    if (allowFailure) return null;
+    throw new SetupError(`gh ${args.join(" ")} failed:\n${(result.stderr || result.stdout || "").trim()}`);
+  }
+  return (result.stdout || "").trim() || null;
+}
+
+/**
+ * Establishes passwordless CI trust for one environment.
+ *
+ * The subject must be the environment form, not the ref form: a job that declares
+ * `environment:` presents `repo:<owner>/<repo>:environment:<name>`, and a ref-based
+ * credential will simply not match.
+ */
+function federateEnvironment({ appObjectId, repository, environmentName, branch, clientId, tenantId, subscriptionId }) {
+  const credentialName = `github-${environmentName}`;
+  const subject = `repo:${repository}:environment:${environmentName}`;
+
+  const existing = graph(
+    `https://graph.microsoft.com/v1.0/applications/${appObjectId}/federatedIdentityCredentials`,
+  )?.value?.find((credential) => credential.name === credentialName);
+
+  if (existing) {
+    stdout.write(`   ${style.dim("skip")}  federated credential ${credentialName} already exists\n`);
+  } else {
+    const credential = graphWrite(
+      "post",
+      `https://graph.microsoft.com/v1.0/applications/${appObjectId}/federatedIdentityCredentials`,
+      {
+        name: credentialName,
+        issuer: "https://token.actions.githubusercontent.com",
+        subject,
+        audiences: ["api://AzureADTokenExchange"],
+        description: `Pawprint GitHub Actions trust for the ${environmentName} environment`,
+      },
+    );
+    if (credential?.id) {
+      recordObject({
+        kind: "federatedIdentityCredential",
+        id: credential.id,
+        parentId: appObjectId,
+        displayName: credentialName,
+      });
+    }
+    stdout.write(`   ${style.good("ok")}    federated credential ${credentialName}\n`);
+    stdout.write(style.dim(`         subject ${subject}\n`));
+  }
+
+  // Restricts which branch may deploy to this environment, so production cannot be
+  // deployed from an arbitrary branch.
+  gh(["api", "--method", "PUT", `repos/${repository}/environments/${environmentName}`, "--silent", "--input", "-"], {
+    input: JSON.stringify({
+      deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+    }),
+  });
+  gh([
+    "api",
+    "--method",
+    "POST",
+    `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+    "--field",
+    `name=${branch}`,
+    "--silent",
+  ]);
+  stdout.write(`   ${style.good("ok")}    environment ${environmentName} restricted to branch ${branch}\n`);
+
+  // Identifiers only. There is no secret to set, because federation replaces it.
+  for (const [name, value] of Object.entries({
+    AZURE_CLIENT_ID: clientId,
+    AZURE_TENANT_ID: tenantId,
+    AZURE_SUBSCRIPTION_ID: subscriptionId,
+  })) {
+    gh(["variable", "set", name, "--env", environmentName, "--repo", repository, "--body", value]);
+  }
+  stdout.write(`   ${style.good("ok")}    3 identity variables set on ${environmentName}\n`);
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -419,6 +501,30 @@ async function main() {
       `   ${style.good("ok")}  Install manifest written to .pawprint-install.json\n` +
         style.dim(`   ${createdObjects.length} directory object(s) recorded for reversal.\n`),
     );
+
+    // ------------------------------------------------- CI trust and policy
+    stdout.write(style.head("7. GitHub Actions trust"));
+    const repository = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
+    if (!repository) {
+      stdout.write(
+        style.warn(
+          "   GitHub CLI is unavailable or not authenticated, so no federated credential\n" +
+            "   was created. Without one, GitHub Actions cannot authenticate to Azure.\n" +
+            "   Run 'gh auth login', then re-run with --federate-only.\n",
+        ),
+      );
+    } else {
+      const environments = (await ask("   Environments to federate (comma separated)", "dev,prod"))
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
+
+      for (const environmentName of environments) {
+        const branch = environmentName === "prod" ? "main" : environmentName;
+        federateEnvironment({ appObjectId, repository, environmentName, branch, clientId, tenantId, subscriptionId: account.id });
+      }
+      writeInstallManifest({ tenantId, operator: account.user?.name });
+    }
 
     stdout.write(style.head("Next steps"));
     stdout.write(

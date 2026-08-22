@@ -22,7 +22,24 @@ from a GitHub Environment variable at runtime.
 
 ## 2. Identity
 
-Create one GitHub Environment per deployment target, each holding:
+Run `npm run setup`. It registers the admin application, defines app roles, and —
+critically — creates a **federated identity credential** per environment so
+GitHub Actions can authenticate to Azure without a secret.
+
+The credential subject must be the environment form:
+
+```
+repo:<owner>/<repo>:environment:<environment-name>
+```
+
+A job that declares `environment:` presents that subject. A ref-based credential
+will simply not match, and the login step fails with an opaque error.
+
+Setup also restricts each environment to a single deployment branch — `dev` to
+`dev`, `prod` to `main` — so production cannot be deployed from an arbitrary
+branch.
+
+Each GitHub Environment ends up with exactly three variables:
 
 ```
 AZURE_CLIENT_ID
@@ -31,8 +48,10 @@ AZURE_SUBSCRIPTION_ID
 ```
 
 These are federated OIDC identifiers, not secrets. There is no client secret to
-create, rotate, or leak. Bind each environment to its branch and apply a
-protection rule with required reviewers on production.
+create, rotate, or leak. Everything else lives in schema-validated configuration
+rather than a settings page.
+
+Verify with `npm run doctor`, which reports whether federated trust exists at all.
 
 ## 3. Wire up CI
 

@@ -36,7 +36,8 @@ the primary artifact and the deployment as the means of producing it.
 ```bash
 npm ci
 npm test
-npm run setup          # detect your tenant, register the admin app, write config
+npm run doctor         # read-only preflight: tooling, sign-in, config, CI trust
+npm run setup          # detect your tenant, register the admin app, federate CI
 ```
 
 ```bash
