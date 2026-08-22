@@ -1,0 +1,34 @@
+{
+  "name": "@ninjapaw/pawprint",
+  "version": "0.1.0",
+  "description": "Deploy it. Prove it. Leave a pawprint. Reproducible Azure scenarios with portable, auditable evidence for every deploy-detect-remediate run.",
+  "license": "MIT",
+  "author": "Dr Bill Mcilhargey",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ninjapaw/pawprint.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "config:check": "node scripts/pawprint-config.mjs --check --environment dev && node scripts/pawprint-config.mjs --check --environment prod",
+    "schema:check": "node scripts/validate-schemas.mjs",
+    "test:guardrails": "node scripts/test-guardrails.mjs",
+    "test": "npm run schema:check && npm run config:check && npm run test:guardrails"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "keywords": [
+    "azure",
+    "bicep",
+    "infrastructure-as-code",
+    "github-actions",
+    "security",
+    "defender-for-cloud",
+    "compliance-evidence"
+  ]
+}

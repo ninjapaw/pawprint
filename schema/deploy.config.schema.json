@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ninjapaw.github.io/pawprint/schema/deploy.config.schema.json",
+  "title": "Pawprint deployment configuration",
+  "description": "Validates both config/deploy.defaults.json (upstream-owned, never edited by adopters) and config/deploy.config.json (adopter-owned overrides). Both files share this shape; every field is optional so an override file may be minimal. Resolution order is builtin < defaults file < override file < environment variable < CLI flag.",
+  "type": "object",
+  "required": ["configVersion"],
+  "additionalProperties": false,
+
+  "properties": {
+    "configVersion": {
+      "description": "Schema contract version. A major mismatch is a hard failure; run 'pawprint config migrate' to upgrade.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+
+    "$schema": { "type": "string" },
+
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
+        "author": { "type": "string" },
+        "organization": { "type": "string" },
+        "license": { "type": "string" },
+        "copyright": { "type": "string" },
+        "repository": { "type": "string", "format": "uri" },
+        "support": { "type": "string", "format": "uri" },
+        "disclaimer": { "type": "string" }
+      }
+    },
+
+    "defaults": { "$ref": "#/$defs/settings" },
+
+    "environments": {
+      "description": "Per-environment overrides layered on top of defaults. Keys are environment names; 'dev' and 'prod' are conventional.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+      "additionalProperties": { "$ref": "#/$defs/environment" }
+    }
+  },
+
+  "$defs": {
+    "noSecretKeys": {
+      "description": "Configuration files are committed to source control. Secret-shaped keys are rejected outright; runtime secrets belong in Key Vault, pipeline identity in GitHub Environment variables. JSON Schema uses ECMA-262 regex with no inline case-insensitive flag, so this pattern covers the conventional camelCase and snake_case spellings. The resolver additionally applies a case-insensitive check and produces the actionable error message.",
+      "propertyNames": {
+        "not": {
+          "pattern": "([Pp]assword|[Pp]asswd|[Ss]ecret|[Aa]pi[_]?[Kk]ey|[Cc]lient[_]?[Ss]ecret|[Tt]oken|[Cc]redential|[Cc]onnection[_]?[Ss]tring|[Pp]rivate[_]?[Kk]ey|[Pp]fx)"
+        }
+      }
+    },
+
+    "settings": {
+      "type": "object",
+      "$ref": "#/$defs/noSecretKeys",
+      "properties": {
+        "location": {
+          "description": "Azure region. Impact: cold.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+$"
+        },
+        "scenario": {
+          "description": "Default scenario id to run.",
+          "type": "string"
+        },
+        "scenarioCatalog": {
+          "description": "Path or repository reference to the scenario catalog.",
+          "type": "string"
+        },
+        "ttlHours": {
+          "description": "Default lifetime for a run's resources before reaping. Impact: hot.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 168
+        },
+        "teardownOnFailure": {
+          "description": "Destroy provisioned resources when a run fails. Recommended true for ephemeral scenarios.",
+          "type": "boolean"
+        },
+        "redactPawprint": {
+          "description": "Mask subscription, tenant, resource and operator identifiers in the emitted pawprint.",
+          "type": "boolean"
+        },
+        "registry": {
+          "description": "Container registry for scenario images. 'ghcr' avoids provisioning an ACR.",
+          "type": "string",
+          "enum": ["ghcr", "acr", "none"]
+        },
+        "parameters": {
+          "description": "Scenario parameter overrides, validated against the target scenario's own schema at preflight.",
+          "type": "object",
+          "$ref": "#/$defs/noSecretKeys"
+        }
+      }
+    },
+
+    "environment": {
+      "type": "object",
+      "$ref": "#/$defs/noSecretKeys",
+      "properties": {
+        "branch": {
+          "description": "Git branch bound to this environment. Deploying from a mismatched branch is a hard failure.",
+          "type": "string"
+        },
+        "githubEnvironment": {
+          "description": "GitHub Environment name holding the OIDC identity variables.",
+          "type": "string"
+        },
+        "subscriptionId": {
+          "description": "MUST remain an empty string. The real value is supplied at runtime from the AZURE_SUBSCRIPTION_ID GitHub Environment variable, so a fork never commits a subscription identifier.",
+          "const": ""
+        },
+        "location": { "type": "string", "pattern": "^[a-z0-9]+$" },
+        "resourceGroup": {
+          "description": "Resource group for this environment. Impact: cold.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 90
+        },
+        "ttlHours": { "type": "number", "exclusiveMinimum": 0, "maximum": 168 },
+        "requireApproval": {
+          "description": "Whether this environment expects a GitHub Environment protection rule. Advisory; enforced by GitHub, asserted at preflight.",
+          "type": "boolean"
+        },
+        "parameters": {
+          "type": "object",
+          "$ref": "#/$defs/noSecretKeys"
+        }
+      }
+    }
+  }
+}

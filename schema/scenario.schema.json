@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ninjapaw.github.io/pawprint/schema/scenario.schema.json",
+  "title": "Pawprint Scenario",
+  "description": "Declarative definition of a deployable scenario. A scenario is data, not code: it declares its parameters, safety envelope, cost, and the assertions that constitute its evidence. Values that describe the scenario belong here, never in CI environment variables.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "title", "version", "cloud", "safety", "cost", "stages", "assertions"],
+  "additionalProperties": false,
+
+  "properties": {
+    "$schema": { "type": "string" },
+
+    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+
+    "id": {
+      "description": "Stable, URL-safe identifier. Also the directory name.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "version": {
+      "description": "Scenario version. Bump on any change to parameters, assertions or safety envelope.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "shortTitle": { "type": ["string", "null"] },
+    "summary": {
+      "description": "One paragraph. What this scenario demonstrates and what the operator should learn.",
+      "type": "string"
+    },
+    "catalog": {
+      "description": "Catalog this scenario belongs to, e.g. 'dojo'.",
+      "type": ["string", "null"]
+    },
+    "difficulty": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+    "authors": { "type": "array", "items": { "type": "string" } },
+    "license": { "type": "string" },
+
+    "cloud": { "type": "string", "enum": ["azure"] },
+    "services": {
+      "description": "Azure services provisioned, for catalog filtering.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+
+    "safety": {
+      "description": "Blast radius declaration. Enforced by CI and surfaced to operators before deployment.",
+      "type": "object",
+      "required": ["intentionallyVulnerable", "publicIngress", "defaultTtlHours", "teardown"],
+      "additionalProperties": false,
+      "properties": {
+        "intentionallyVulnerable": {
+          "description": "True when the scenario deliberately provisions a weakened or exploitable state.",
+          "type": "boolean"
+        },
+        "publicIngress": {
+          "description": "True when any endpoint is reachable from the public internet. Requires ingressJustification.",
+          "type": "boolean"
+        },
+        "ingressJustification": { "type": ["string", "null"] },
+        "defaultTtlHours": { "type": "number", "exclusiveMinimum": 0, "maximum": 168 },
+        "maxTtlHours": { "type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 168 },
+        "teardown": {
+          "description": "How the scenario releases resources. 'resource-group' deletes the run's dedicated group; 'deployment-stack' deletes the managed stack.",
+          "type": "string",
+          "enum": ["resource-group", "deployment-stack"]
+        },
+        "isolationNote": { "type": ["string", "null"] },
+        "disclaimer": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "publicIngress": { "const": true } }, "required": ["publicIngress"] },
+          "then": {
+            "required": ["ingressJustification"],
+            "properties": { "ingressJustification": { "type": "string", "minLength": 20 } }
+          }
+        }
+      ]
+    },
+
+    "cost": {
+      "type": "object",
+      "required": ["estimatedPerHour", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "estimatedPerHour": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "notes": { "type": ["string", "null"] },
+        "freeTierEligible": { "type": ["boolean", "null"] }
+      }
+    },
+
+    "controls": {
+      "description": "Security controls or techniques this scenario exercises.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["framework", "id"],
+        "additionalProperties": false,
+        "properties": {
+          "framework": { "type": "string" },
+          "id": { "type": "string" },
+          "title": { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "vulnerability": {
+      "description": "Present when the scenario centres on a specific known vulnerability.",
+      "type": ["object", "null"],
+      "required": ["id", "affectedVersions", "fixedVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "advisoryUrl": { "type": ["string", "null"] },
+        "affectedVersions": { "type": "string" },
+        "fixedVersion": { "type": "string" },
+        "component": { "type": ["string", "null"] }
+      }
+    },
+
+    "stages": {
+      "description": "Lifecycle stages this scenario implements. destroy is mandatory.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["provision", "build", "deploy", "arm", "detect", "remediate", "verify", "destroy"]
+      },
+      "contains": { "const": "destroy" }
+    },
+
+    "parameters": {
+      "description": "Declared knobs. This is where values that used to live in CI environment variables belong. Each parameter is typed, defaulted and impact-tagged.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "description", "impact"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "enum": ["string", "number", "boolean"] },
+          "description": { "type": "string", "minLength": 1 },
+          "default": { "type": ["string", "number", "boolean", "null"] },
+          "enum": { "type": "array", "items": { "type": ["string", "number", "boolean"] } },
+          "pattern": { "type": ["string", "null"] },
+          "required": { "type": "boolean", "default": false },
+          "impact": {
+            "description": "hot: app setting + restart. warm: infrastructure redeploy. cold: creates new resources, orphans old. rebootstrap: OIDC federation must be recreated.",
+            "type": "string",
+            "enum": ["hot", "warm", "cold", "rebootstrap"]
+          },
+          "critical": {
+            "description": "True when a wrong or missing value would invalidate the evidence. Critical parameters MUST NOT be given a silent fallback; a missing value is a hard failure.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+
+    "detection": {
+      "description": "Detection tooling this scenario expects to fire.",
+      "type": ["object", "null"],
+      "required": ["provider"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["defender-for-cloud", "microsoft-sentinel", "entra", "azure-policy", "none", "other"]
+        },
+        "config": {
+          "description": "Provider-specific configuration, e.g. Defender plan tiers and extensions.",
+          "type": "object"
+        },
+        "latencyBudgetMinutes": {
+          "description": "How long detection may reasonably take. Assertions evaluated before this elapses report 'unknown' rather than 'fail'.",
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    },
+
+    "assertions": {
+      "description": "The evidence contract. Each assertion becomes a check in the emitted pawprint, keyed by the same id.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "stage", "source"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "label": { "type": "string", "minLength": 1 },
+          "stage": {
+            "type": "string",
+            "enum": ["provision", "build", "deploy", "arm", "detect", "remediate", "verify", "destroy"]
+          },
+          "source": {
+            "description": "Where the observation is taken from. 'runtime' reads the running system and is the strongest evidence. 'config' reads requested configuration and is explicitly weaker.",
+            "type": "string",
+            "enum": ["runtime", "control-plane", "http", "registry", "config", "external"]
+          },
+          "expected": { "type": ["string", "number", "boolean", "null"] },
+          "reference": { "type": ["string", "null"] },
+          "mayBeUnknown": {
+            "description": "True for asynchronous observations that legitimately report 'unknown' before the latency budget elapses.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+
+    "endpoints": {
+      "description": "Endpoints the scenario exposes once deployed.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "public"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "public": { "type": "boolean" },
+          "description": { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readme": { "type": "string", "default": "README.md" },
+        "walkthrough": { "type": ["string", "null"] },
+        "references": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

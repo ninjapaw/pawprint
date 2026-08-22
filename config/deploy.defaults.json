@@ -1,0 +1,33 @@
+{
+  "$schema": "../schema/deploy.config.schema.json",
+  "configVersion": "1.0.0",
+  "project": {
+    "name": "Pawprint",
+    "slug": "pawprint",
+    "organization": "Ninja Paw",
+    "license": "MIT",
+    "repository": "https://github.com/ninjapaw/pawprint",
+    "support": "https://github.com/ninjapaw/pawprint/issues"
+  },
+  "defaults": {
+    "location": "centralus",
+    "ttlHours": 8,
+    "teardownOnFailure": true,
+    "redactPawprint": false,
+    "registry": "ghcr"
+  },
+  "environments": {
+    "dev": {
+      "branch": "dev",
+      "githubEnvironment": "dev",
+      "subscriptionId": "",
+      "requireApproval": false
+    },
+    "prod": {
+      "branch": "main",
+      "githubEnvironment": "prod",
+      "subscriptionId": "",
+      "requireApproval": true
+    }
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "schemaVersion": "1.0.0",
+
+  "run": {
+    "id": "20260822T202155Z-1234",
+    "startedAt": "2026-08-22T20:21:55Z",
+    "endedAt": "2026-08-22T20:35:10Z",
+    "durationSeconds": 795,
+    "command": "deploy",
+    "stage": "full",
+    "result": "pass",
+    "failureMessage": null
+  },
+
+  "subject": {
+    "kind": "scenario",
+    "scenarioId": "defender-appservice-nginx-cve-2026-42533",
+    "scenarioName": "Defender for Cloud: NGINX CVE detection and remediation on App Service",
+    "scenarioVersion": "1.0.0",
+    "catalog": "dojo",
+    "controls": [
+      { "framework": "MITRE ATT&CK", "id": "T1190", "title": "Exploit Public-Facing Application" }
+    ]
+  },
+
+  "origin": {
+    "type": "github-actions",
+    "operator": "[redacted]",
+    "detail": "workflow deploy, run 12345, attempt 1, triggered by workflow_dispatch",
+    "host": null,
+    "workflow": "deploy",
+    "workflowRunId": "12345",
+    "workflowRunAttempt": 1,
+    "event": "workflow_dispatch"
+  },
+
+  "source": {
+    "repository": "ninjapaw/ninjapaws-cloud-security-dojo",
+    "branch": "dev",
+    "commit": "9f1c2ab6d4e8f70b3c5a1d9e2f4b6a8c0d1e3f57",
+    "dirty": false,
+    "appVersion": "1.0.0",
+    "runnerVersion": "0.1.0"
+  },
+
+  "config": {
+    "configVersion": "1.0.0",
+    "hash": "sha256:3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b8551",
+    "sources": ["builtin", "defaults-file", "override-file", "environment"],
+    "resolved": {
+      "environment": "dev",
+      "location": "centralus",
+      "ttlHours": 8,
+      "registry": "ghcr",
+      "parameters": {
+        "nginxVersion": "1.30.3",
+        "vulnerabilityStatus": "vulnerable",
+        "defenderEnabled": true
+      }
+    }
+  },
+
+  "target": {
+    "cloud": "azure",
+    "environment": "dev",
+    "subscriptionId": "[redacted]",
+    "tenantId": "[redacted]",
+    "resourceGroup": "NP-ninjapaws-dojo-Dev-CentralUS",
+    "location": "centralus",
+    "expiresAt": "2026-08-23T04:21:55Z"
+  },
+
+  "artifacts": {
+    "images": [
+      {
+        "name": "ninjapaws-dojo",
+        "registry": "ghcr.io/ninjapaw",
+        "tags": ["9f1c2ab", "latest", "vulnerable"],
+        "digest": "sha256:5d41402abc4b2a76b9719d911017c592a5f1e2c3d4b5a6978091a2b3c4d5e6f7",
+        "buildFingerprint": "a3f5c9d2e1b8",
+        "rebuilt": false
+      }
+    ],
+    "endpoints": [
+      { "name": "dashboard", "url": "https://ninjapaws-dojo-app-dev.azurewebsites.net/", "public": true },
+      { "name": "health", "url": "https://ninjapaws-dojo-app-dev.azurewebsites.net/health", "public": true }
+    ],
+    "resourceIds": ["[redacted]"]
+  },
+
+  "tasks": [
+    {
+      "key": "preflight",
+      "label": "Preflight: required tooling, Azure sign-in, subscription selection",
+      "stage": "preflight",
+      "status": "success",
+      "startedAt": "2026-08-22T20:21:55Z",
+      "endedAt": "2026-08-22T20:22:05Z",
+      "durationSeconds": 10,
+      "detail": "Azure CLI 2.89.0, Bicep 0.46.1, signed in via OIDC federated credential."
+    },
+    {
+      "key": "infra",
+      "label": "Deploy the Bicep infrastructure",
+      "stage": "provision",
+      "status": "success",
+      "startedAt": "2026-08-22T20:22:05Z",
+      "endedAt": "2026-08-22T20:26:41Z",
+      "durationSeconds": 276,
+      "detail": "14 resource operations completed without a failed state."
+    },
+    {
+      "key": "image",
+      "label": "Build and push the container image, or reuse the matching digest",
+      "stage": "build",
+      "status": "skipped",
+      "startedAt": "2026-08-22T20:26:41Z",
+      "endedAt": "2026-08-22T20:26:58Z",
+      "durationSeconds": 17,
+      "detail": "Fingerprint a3f5c9d2e1b8 matched an existing manifest; re-pointed 3 tags with no layer upload."
+    },
+    {
+      "key": "verify",
+      "label": "Verify Azure configuration, identity, and live endpoints",
+      "stage": "verify",
+      "status": "success",
+      "startedAt": "2026-08-22T20:30:12Z",
+      "endedAt": "2026-08-22T20:35:10Z",
+      "durationSeconds": 298,
+      "detail": "All endpoint and identity assertions passed."
+    }
+  ],
+
+  "checks": [
+    {
+      "id": "rg.tagged",
+      "label": "Resource group exists and carries the ownership and expiry tags",
+      "stage": "provision",
+      "result": "pass",
+      "detail": "NP-ninjapaws-dojo-Dev-CentralUS in centralus tagged pawprint.managed=true, pawprint.expiresAt=2026-08-23T04:21:55Z.",
+      "observedAt": "2026-08-22T20:22:20Z",
+      "source": "control-plane",
+      "expected": null,
+      "observed": null,
+      "reference": null
+    },
+    {
+      "id": "runtime.nginx-version",
+      "label": "Running NGINX binary reports the expected version",
+      "stage": "arm",
+      "result": "pass",
+      "detail": "nginx -v on the running container reported 1.30.3.",
+      "observedAt": "2026-08-22T20:31:02Z",
+      "source": "runtime",
+      "expected": "1.30.3",
+      "observed": "1.30.3",
+      "reference": null
+    },
+    {
+      "id": "runtime.vulnerability-detected",
+      "label": "Container self-assessment computes the vulnerable state from the running system",
+      "stage": "arm",
+      "result": "pass",
+      "detail": "Runtime evidence file reports vulnerability_detected=true, derived from binary version 1.30.3 and an active affected map block.",
+      "observedAt": "2026-08-22T20:31:04Z",
+      "source": "runtime",
+      "expected": true,
+      "observed": true,
+      "reference": "Computed at container start, never from the requested parameter."
+    },
+    {
+      "id": "defender.cve-surfaced",
+      "label": "Target CVE appears in Defender findings",
+      "stage": "detect",
+      "result": "unknown",
+      "detail": "CVE-2026-42533 was not present in this payload. Vulnerability assessment is asynchronous and the 720 minute latency budget has not elapsed.",
+      "observedAt": "2026-08-22T20:34:50Z",
+      "source": "control-plane",
+      "expected": "CVE-2026-42533",
+      "observed": null,
+      "reference": null
+    },
+    {
+      "id": "app.health",
+      "label": "Health endpoint responds over HTTPS",
+      "stage": "deploy",
+      "result": "pass",
+      "detail": "GET /health returned HTTP 200 in 0.145s.",
+      "observedAt": "2026-08-22T20:30:40Z",
+      "source": "http",
+      "expected": 200,
+      "observed": 200,
+      "reference": null
+    }
+  ],
+
+  "summary": {
+    "verdict": "pass",
+    "headline": "Scenario armed and detectable; Defender confirmation pending.",
+    "note": "One assertion reports unknown because Defender vulnerability assessment had not completed within this run.",
+    "tasks": {
+      "total": 4,
+      "success": 3,
+      "failure": 0,
+      "skipped": 1,
+      "not_applicable": 0,
+      "not_started": 0
+    },
+    "checks": {
+      "total": 5,
+      "pass": 4,
+      "fail": 0,
+      "unknown": 1,
+      "not_applicable": 0
+    }
+  },
+
+  "redaction": {
+    "applied": true,
+    "fields": [
+      "/origin/operator",
+      "/target/subscriptionId",
+      "/target/tenantId",
+      "/artifacts/resourceIds/0"
+    ],
+    "mask": "[redacted]"
+  },
+
+  "console": null
+}

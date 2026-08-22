@@ -1,0 +1,272 @@
+{
+  "$schema": "../schema/scenario.schema.json",
+  "schemaVersion": "1.0.0",
+
+  "id": "defender-appservice-nginx-cve-2026-42533",
+  "version": "1.0.0",
+  "title": "Defender for Cloud: NGINX CVE detection and remediation on App Service",
+  "shortTitle": "NGINX CVE Detection and Remediation",
+  "summary": "Provisions a Linux container on App Service running an NGINX version affected by CVE-2026-42533, together with the map/regex configuration that makes the condition reachable. Defender for Cloud is expected to surface the finding; the remediation stage upgrades NGINX and the verify stage proves the detection clears.",
+  "catalog": "dojo",
+  "difficulty": "intermediate",
+  "license": "MIT",
+
+  "cloud": "azure",
+  "services": [
+    "Azure App Service",
+    "Azure Container Registry",
+    "Microsoft Defender for App Service",
+    "Microsoft Defender for Containers",
+    "Microsoft Defender CSPM"
+  ],
+
+  "safety": {
+    "intentionallyVulnerable": true,
+    "publicIngress": true,
+    "ingressJustification": "Defender for App Service evaluates inbound request telemetry, so the scenario cannot demonstrate detection without a reachable public endpoint. The container serves only a static status dashboard and read-only JSON endpoints; it holds no data and accepts no writes.",
+    "defaultTtlHours": 8,
+    "maxTtlHours": 24,
+    "teardown": "resource-group",
+    "isolationNote": "Deploy only to an isolated subscription you control.",
+    "disclaimer": "This scenario provisions an INTENTIONALLY VULNERABLE environment. Provided as-is, without warranty of any kind. USE AT YOUR OWN RISK."
+  },
+
+  "cost": {
+    "estimatedPerHour": 0.08,
+    "currency": "USD",
+    "notes": "App Service Plan B1 plus Basic ACR. Defender plan charges are subscription-scoped and are not included; enabling Defender for App Service and Containers may incur separate per-resource costs.",
+    "freeTierEligible": false
+  },
+
+  "controls": [
+    { "framework": "MITRE ATT&CK", "id": "T1190", "title": "Exploit Public-Facing Application" },
+    { "framework": "NIST SP 800-53", "id": "RA-5", "title": "Vulnerability Monitoring and Scanning" },
+    { "framework": "NIST SP 800-53", "id": "SI-2", "title": "Flaw Remediation" }
+  ],
+
+  "vulnerability": {
+    "id": "CVE-2026-42533",
+    "advisoryUrl": "https://my.f5.com/manage/s/article/K000162097",
+    "affectedVersions": "1.30.0 - 1.30.3",
+    "fixedVersion": "1.30.4",
+    "component": "NGINX Open Source"
+  },
+
+  "stages": ["provision", "build", "deploy", "arm", "detect", "remediate", "verify", "destroy"],
+
+  "parameters": {
+    "nginxVersion": {
+      "type": "string",
+      "description": "NGINX version installed in the container image. Determines whether the scenario is in its affected or remediated state.",
+      "default": "1.30.3",
+      "impact": "warm",
+      "critical": true
+    },
+    "vulnerabilityStatus": {
+      "type": "string",
+      "description": "Which scenario configuration to write at container start. 'vulnerable' emits the affected map/regex block; 'remediated' removes it.",
+      "default": "vulnerable",
+      "enum": ["vulnerable", "remediated"],
+      "impact": "warm",
+      "critical": true
+    },
+    "baseOsImage": {
+      "type": "string",
+      "description": "Base OS image for the container build.",
+      "default": "ubuntu",
+      "impact": "warm"
+    },
+    "baseOsVersion": {
+      "type": "string",
+      "description": "Base OS image tag.",
+      "default": "24.04",
+      "impact": "warm"
+    },
+    "nodeMajorVersion": {
+      "type": "string",
+      "description": "Node.js major version serving the status API behind NGINX.",
+      "default": "20",
+      "impact": "warm"
+    },
+    "port": {
+      "type": "string",
+      "description": "Port the Node.js application listens on behind the NGINX reverse proxy.",
+      "default": "3000",
+      "impact": "hot"
+    },
+    "npmNetworkMode": {
+      "type": "string",
+      "description": "Whether the image build may reach the npm registry. 'offline' supports air-gapped builds.",
+      "default": "online",
+      "enum": ["online", "offline"],
+      "impact": "warm"
+    },
+    "defenderEnabled": {
+      "type": "boolean",
+      "description": "Whether the run activates Defender plans and performs a post-verification scan. Disabling produces a deployment without detection evidence.",
+      "default": true,
+      "impact": "warm",
+      "critical": true
+    }
+  },
+
+  "detection": {
+    "provider": "defender-for-cloud",
+    "latencyBudgetMinutes": 720,
+    "config": {
+      "plans": {
+        "AppServices": "Standard",
+        "Containers": "Standard",
+        "CloudPosture": "Standard",
+        "Arm": "Standard"
+      },
+      "cspmExtensions": {
+        "AgentlessServerlessPosture": true,
+        "ServerlessContainers": true,
+        "ContainerRegistriesVulnerabilityAssessments": true
+      },
+      "containersExtensions": {
+        "ContainerRegistriesVulnerabilityAssessments": true
+      }
+    }
+  },
+
+  "assertions": [
+    {
+      "id": "rg.tagged",
+      "label": "Resource group exists and carries the ownership and expiry tags",
+      "stage": "provision",
+      "source": "control-plane"
+    },
+    {
+      "id": "infra.deployed",
+      "label": "Bicep infrastructure deployment reached Succeeded",
+      "stage": "provision",
+      "source": "control-plane"
+    },
+    {
+      "id": "image.present",
+      "label": "Container image is present in the registry",
+      "stage": "build",
+      "source": "registry"
+    },
+    {
+      "id": "image.matches-source",
+      "label": "Deployed image digest matches the current source fingerprint",
+      "stage": "deploy",
+      "source": "registry"
+    },
+    {
+      "id": "identity.acrpull",
+      "label": "User-assigned managed identity holds AcrPull on the registry",
+      "stage": "deploy",
+      "source": "control-plane"
+    },
+    {
+      "id": "app.https",
+      "label": "Public site responds over HTTPS",
+      "stage": "deploy",
+      "source": "http"
+    },
+    {
+      "id": "app.health",
+      "label": "Health endpoint responds over HTTPS",
+      "stage": "deploy",
+      "source": "http"
+    },
+    {
+      "id": "runtime.nginx-version",
+      "label": "Running NGINX binary reports the expected version",
+      "stage": "arm",
+      "source": "runtime",
+      "expected": "1.30.3"
+    },
+    {
+      "id": "runtime.affected-config",
+      "label": "Running NGINX configuration contains the affected map/regex block",
+      "stage": "arm",
+      "source": "runtime",
+      "expected": true
+    },
+    {
+      "id": "runtime.vulnerability-detected",
+      "label": "Container self-assessment computes the vulnerable state from the running system",
+      "stage": "arm",
+      "source": "runtime",
+      "expected": true,
+      "reference": "Computed at container start from the NGINX binary version and the active configuration, never from the requested parameter."
+    },
+    {
+      "id": "defender.plans-active",
+      "label": "Requested Defender plans report the configured tier",
+      "stage": "detect",
+      "source": "control-plane",
+      "mayBeUnknown": true
+    },
+    {
+      "id": "defender.assessment-inventory",
+      "label": "Defender assessment inventory returned data for the resource group",
+      "stage": "detect",
+      "source": "control-plane",
+      "mayBeUnknown": true
+    },
+    {
+      "id": "defender.cve-surfaced",
+      "label": "Target CVE appears in Defender findings",
+      "stage": "detect",
+      "source": "control-plane",
+      "expected": "CVE-2026-42533",
+      "mayBeUnknown": true,
+      "reference": "Vulnerability assessment is asynchronous; reports unknown until the image scan completes within the latency budget."
+    },
+    {
+      "id": "remediate.nginx-upgraded",
+      "label": "Running NGINX binary reports the fixed version after remediation",
+      "stage": "remediate",
+      "source": "runtime",
+      "expected": "1.30.4"
+    },
+    {
+      "id": "remediate.config-removed",
+      "label": "Affected map/regex block is absent from the running configuration",
+      "stage": "remediate",
+      "source": "runtime",
+      "expected": false
+    },
+    {
+      "id": "verify.vulnerability-cleared",
+      "label": "Container self-assessment no longer computes the vulnerable state",
+      "stage": "verify",
+      "source": "runtime",
+      "expected": false
+    },
+    {
+      "id": "verify.cve-cleared",
+      "label": "Target CVE no longer appears in Defender findings",
+      "stage": "verify",
+      "source": "control-plane",
+      "mayBeUnknown": true
+    },
+    {
+      "id": "destroy.resources-released",
+      "label": "All scenario resources were released and the resource group is gone",
+      "stage": "destroy",
+      "source": "control-plane"
+    }
+  ],
+
+  "endpoints": [
+    { "name": "dashboard", "path": "/", "public": true, "description": "Static status dashboard." },
+    { "name": "health", "path": "/health", "public": true, "description": "Liveness probe." },
+    { "name": "status", "path": "/api/status", "public": true, "description": "Runtime CVE evidence as JSON." }
+  ],
+
+  "documentation": {
+    "readme": "README.md",
+    "walkthrough": "WALKTHROUGH.md",
+    "references": [
+      "https://my.f5.com/manage/s/article/K000162097",
+      "https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction"
+    ]
+  }
+}

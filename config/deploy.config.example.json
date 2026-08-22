@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema/deploy.config.schema.json",
+  "configVersion": "1.0.0",
+
+  "project": {
+    "name": "My Scenario Catalog",
+    "repository": "https://github.com/my-org/my-repo"
+  },
+
+  "defaults": {
+    "location": "eastus",
+    "ttlHours": 4
+  },
+
+  "environments": {
+    "dev": {
+      "subscriptionId": "",
+      "resourceGroup": "RG-my-scenarios-dev-eastus"
+    },
+    "prod": {
+      "subscriptionId": "",
+      "resourceGroup": "RG-my-scenarios-prod-eastus"
+    }
+  }
+}

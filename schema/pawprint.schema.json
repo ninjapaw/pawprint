@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ninjapaw.github.io/pawprint/schema/pawprint.schema.json",
+  "title": "Pawprint",
+  "description": "Portable evidence artifact emitted by a Pawprint run. Records what was deployed, what was asserted, and what was observed, so the run can be audited, diffed and shared independently of the system that produced it.",
+  "type": "object",
+  "required": ["schemaVersion", "run", "subject", "origin", "source", "config", "target", "tasks", "checks", "summary"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schemaVersion": {
+      "description": "Semantic version of this schema. Consumers MUST reject a major version they do not implement rather than rendering partial data.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+
+    "run": {
+      "type": "object",
+      "required": ["id", "startedAt", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Unique run identifier. Convention: <ISO8601 basic UTC>-<discriminator>, e.g. 20260822T202155Z-1234.",
+          "type": "string",
+          "minLength": 1
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": ["string", "null"], "format": "date-time" },
+        "durationSeconds": { "type": ["number", "null"], "minimum": 0 },
+        "command": {
+          "description": "Lifecycle command invoked, e.g. setup, deploy, verify, destroy.",
+          "type": "string"
+        },
+        "stage": {
+          "description": "Requested stage filter, or 'full' when the whole lifecycle ran.",
+          "type": "string"
+        },
+        "result": { "$ref": "#/$defs/verdict" },
+        "failureMessage": { "type": ["string", "null"] }
+      }
+    },
+
+    "subject": {
+      "description": "What this run acted upon. A scenario for catalog runs; a plain deployment otherwise.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["scenario", "deployment"] },
+        "scenarioId": { "type": ["string", "null"] },
+        "scenarioName": { "type": ["string", "null"] },
+        "scenarioVersion": { "type": ["string", "null"] },
+        "catalog": {
+          "description": "Catalog the scenario came from, e.g. 'dojo'.",
+          "type": ["string", "null"]
+        },
+        "controls": {
+          "description": "Control identifiers the scenario claims to exercise, e.g. MITRE ATT&CK, NIST 800-53, CIS.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/control" }
+        }
+      }
+    },
+
+    "origin": {
+      "description": "Who and what produced this run.",
+      "type": "object",
+      "required": ["type", "operator"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["github-actions", "local", "other"] },
+        "operator": {
+          "description": "Identity that initiated the run. Redacted when redaction.applied is true.",
+          "type": "string"
+        },
+        "detail": { "type": ["string", "null"] },
+        "host": { "type": ["string", "null"] },
+        "workflow": { "type": ["string", "null"] },
+        "workflowRunId": { "type": ["string", "null"] },
+        "workflowRunAttempt": { "type": ["integer", "null"], "minimum": 1 },
+        "event": { "type": ["string", "null"] }
+      }
+    },
+
+    "source": {
+      "description": "Provenance of the code that produced this run.",
+      "type": "object",
+      "required": ["commit", "dirty"],
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "commit": { "type": "string" },
+        "dirty": {
+          "description": "True when the working tree had uncommitted changes. A dirty run is not reproducible and MUST be surfaced as such.",
+          "type": "boolean"
+        },
+        "appVersion": { "type": ["string", "null"] },
+        "runnerVersion": {
+          "description": "Version of Pawprint that produced this artifact.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+
+    "config": {
+      "description": "The configuration that produced this run, after all precedence layers collapsed.",
+      "type": "object",
+      "required": ["configVersion", "hash"],
+      "additionalProperties": false,
+      "properties": {
+        "configVersion": { "type": "string" },
+        "hash": {
+          "description": "SHA-256 of the canonicalised resolved config. Two runs with identical hashes but differing results indicate non-determinism.",
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "resolved": {
+          "description": "The fully merged, resolved configuration. Secret-shaped values MUST NOT appear here.",
+          "type": "object"
+        },
+        "sources": {
+          "description": "Ordered precedence layers that contributed, lowest first.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["builtin", "defaults-file", "override-file", "environment", "cli"] }
+        }
+      }
+    },
+
+    "target": {
+      "description": "Where the run deployed.",
+      "type": "object",
+      "required": ["cloud", "environment"],
+      "additionalProperties": false,
+      "properties": {
+        "cloud": { "type": "string", "enum": ["azure", "other"] },
+        "environment": { "type": "string" },
+        "subscriptionId": { "$ref": "#/$defs/maskableId" },
+        "tenantId": { "$ref": "#/$defs/maskableId" },
+        "resourceGroup": { "type": ["string", "null"] },
+        "location": { "type": ["string", "null"] },
+        "expiresAt": {
+          "description": "TTL boundary. Resources are expected to be reaped at or before this instant.",
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    },
+
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "registry": { "type": ["string", "null"] },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "digest": {
+                "type": ["string", "null"],
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "buildFingerprint": {
+                "description": "Digest of the build context, used to prove the running image matches the working tree.",
+                "type": ["string", "null"]
+              },
+              "rebuilt": { "type": ["boolean", "null"] }
+            }
+          }
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "public": {
+                "description": "True when reachable from the public internet. Drives blast-radius reporting.",
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "resourceIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/maskableId" }
+        }
+      }
+    },
+
+    "tasks": {
+      "description": "Ordered lifecycle steps the runner executed.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "stage": { "$ref": "#/$defs/stage" },
+          "status": {
+            "type": "string",
+            "enum": ["not_started", "in_progress", "success", "failure", "skipped", "not_applicable"]
+          },
+          "startedAt": { "type": ["string", "null"], "format": "date-time" },
+          "endedAt": { "type": ["string", "null"], "format": "date-time" },
+          "durationSeconds": { "type": ["number", "null"], "minimum": 0 },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+
+    "checks": {
+      "description": "Assertions evaluated against the deployed system. This is the evidence.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "result", "detail"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Stable identifier, so the same assertion can be diffed across runs even if its label changes.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "label": { "type": "string" },
+          "stage": { "$ref": "#/$defs/stage" },
+          "result": {
+            "type": "string",
+            "enum": ["pass", "fail", "unknown", "not_applicable"]
+          },
+          "detail": {
+            "description": "Human-readable evidence. Explain what was observed, not what was intended.",
+            "type": "string"
+          },
+          "observedAt": { "type": ["string", "null"], "format": "date-time" },
+          "expected": { "type": ["string", "number", "boolean", "null"] },
+          "observed": { "type": ["string", "number", "boolean", "null"] },
+          "source": {
+            "description": "Where the observation came from. 'runtime' means read from the running system; 'config' means read from requested configuration and is weaker evidence.",
+            "type": "string",
+            "enum": ["runtime", "control-plane", "http", "registry", "config", "external"]
+          },
+          "reference": { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "summary": {
+      "type": "object",
+      "required": ["verdict", "tasks", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "headline": { "type": ["string", "null"] },
+        "note": { "type": ["string", "null"] },
+        "tasks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "success": { "type": "integer", "minimum": 0 },
+            "failure": { "type": "integer", "minimum": 0 },
+            "skipped": { "type": "integer", "minimum": 0 },
+            "not_applicable": { "type": "integer", "minimum": 0 },
+            "not_started": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "pass": { "type": "integer", "minimum": 0 },
+            "fail": { "type": "integer", "minimum": 0 },
+            "unknown": { "type": "integer", "minimum": 0 },
+            "not_applicable": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "redaction": {
+      "description": "Redaction state. A pawprint shared outside the producing organization SHOULD have applied set to true.",
+      "type": "object",
+      "required": ["applied"],
+      "additionalProperties": false,
+      "properties": {
+        "applied": { "type": "boolean" },
+        "fields": {
+          "description": "JSON Pointers to values that were masked.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "mask": {
+          "description": "Literal used to replace redacted values.",
+          "type": "string",
+          "default": "[redacted]"
+        }
+      }
+    },
+
+    "console": {
+      "description": "Optional captured console stream. Omitted from redacted pawprints unless separately scrubbed.",
+      "type": ["string", "null"]
+    }
+  },
+
+  "$defs": {
+    "stage": {
+      "description": "Lifecycle stage. provision/build/deploy establish the state; arm makes it detectable; detect and verify gather evidence; destroy releases resources.",
+      "type": "string",
+      "enum": ["preflight", "plan", "provision", "build", "deploy", "arm", "detect", "remediate", "verify", "destroy"]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "fail", "partial", "unknown", "in_progress"]
+    },
+    "maskableId": {
+      "description": "An identifier that is either present in full, masked, or absent.",
+      "type": ["string", "null"]
+    },
+    "control": {
+      "type": "object",
+      "required": ["framework", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "framework": { "type": "string" },
+        "id": { "type": "string" },
+        "title": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
