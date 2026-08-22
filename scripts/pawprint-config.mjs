@@ -184,6 +184,32 @@ function resolveConfig({ environment, branch, overridePath }) {
   };
 }
 
+/**
+ * Fails closed. A subscription is deployable only when it appears in the
+ * allowlist, so an unconfigured or mistyped allowlist blocks deployment rather
+ * than silently permitting the wrong subscription.
+ */
+function assertSubscriptionApproved(resolved, subscriptionId) {
+  const approved = resolved.approvedSubscriptions;
+
+  if (!Array.isArray(approved) || approved.length === 0) {
+    throw new ConfigError(
+      `No approved subscriptions are configured, so deployment is refused.\n` +
+        `  Add the subscription to 'approvedSubscriptions' in config/deploy.config.json.\n` +
+        `  Requested: ${subscriptionId}`,
+    );
+  }
+
+  const normalized = approved.map((id) => id.toLowerCase());
+  if (!normalized.includes(subscriptionId.toLowerCase())) {
+    throw new ConfigError(
+      `Subscription ${subscriptionId} is not in the approved list.\n` +
+        `  Approved: ${approved.join(", ")}\n` +
+        `  Add it deliberately if this is intended; Pawprint will not deploy into an unapproved subscription.`,
+    );
+  }
+}
+
 function toEnvironmentVariables(result) {
   const { resolved } = result;
   const entries = {
@@ -232,6 +258,7 @@ function main() {
       config: { type: "string" },
       check: { type: "boolean", default: false },
       json: { type: "boolean", default: false },
+      subscription: { type: "string" },
       "github-env": { type: "boolean", default: false },
       "github-output": { type: "boolean", default: false },
     },
@@ -246,6 +273,10 @@ function main() {
     branch: values.branch,
     overridePath: values.config,
   });
+
+  if (values.subscription) {
+    assertSubscriptionApproved(result.resolved, values.subscription);
+  }
 
   if (values.check) {
     process.stdout.write(

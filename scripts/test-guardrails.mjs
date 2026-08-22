@@ -73,6 +73,39 @@ const cases = [
     args: () => [],
     expect: /--environment|--branch/i,
   },
+  {
+    name: "refuses a subscription when no allowlist is configured",
+    args: () => ["--environment", "dev", "--subscription", "16037566-d4df-4c7c-b484-346d8472b4c4"],
+    expect: /No approved subscriptions are configured/i,
+  },
+  {
+    name: "refuses a subscription absent from the allowlist",
+    args: () => [
+      "--environment",
+      "dev",
+      "--subscription",
+      "99999999-9999-9999-9999-999999999999",
+      "--config",
+      writeConfig("allowlist.json", {
+        configVersion: "1.0.0",
+        defaults: { approvedSubscriptions: ["16037566-d4df-4c7c-b484-346d8472b4c4"] },
+      }),
+    ],
+    expect: /is not in the approved list/i,
+  },
+  {
+    name: "rejects a malformed subscription id in the allowlist",
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig("bad-allowlist.json", {
+        configVersion: "1.0.0",
+        defaults: { approvedSubscriptions: ["not-a-guid"] },
+      }),
+    ],
+    expect: /pattern|must match/i,
+  },
 ];
 
 let failures = 0;
@@ -104,6 +137,29 @@ if (healthy.code !== 0) {
   process.stderr.write(`FAIL  accepts the shipped default configuration\n      ${healthy.stderr.trim()}\n`);
 } else {
   process.stdout.write("ok    accepts the shipped default configuration\n");
+}
+
+// The allowlist must permit as well as refuse, otherwise it is just a wall.
+const approvedPath = writeConfig("approved.json", {
+  configVersion: "1.0.0",
+  defaults: { approvedSubscriptions: ["16037566-d4df-4c7c-b484-346d8472b4c4"] },
+});
+const approved = runResolver([
+  "--environment",
+  "dev",
+  "--check",
+  "--config",
+  approvedPath,
+  "--subscription",
+  "16037566-D4DF-4C7C-B484-346D8472B4C4",
+]);
+if (approved.code !== 0) {
+  failures += 1;
+  process.stderr.write(
+    `FAIL  accepts an approved subscription regardless of case\n      ${approved.stderr.trim()}\n`,
+  );
+} else {
+  process.stdout.write("ok    accepts an approved subscription regardless of case\n");
 }
 
 if (failures > 0) {

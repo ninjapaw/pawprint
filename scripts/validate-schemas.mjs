@@ -26,6 +26,12 @@ const SAMPLE_BINDINGS = [
   { suffix: ".config.json", schema: "deploy.config.schema.json" },
 ];
 
+/** Shipped configuration that must validate against its schema on every run. */
+const SHIPPED_CONFIG = [
+  { file: "config/connectors.catalog.json", schema: "connectors.schema.json" },
+  { file: "config/deploy.defaults.json", schema: "deploy.config.schema.json" },
+];
+
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 function main() {
@@ -50,6 +56,24 @@ function main() {
     samples = readdirSync(SAMPLE_DIR).filter((name) => name.endsWith(".json"));
   } catch {
     process.stdout.write("note  no samples/ directory; skipping fixture validation\n");
+  }
+
+  for (const { file, schema } of SHIPPED_CONFIG) {
+    const validate = compiled.get(schema);
+    if (!validate) {
+      failures += 1;
+      process.stderr.write(`FAIL  config  ${file}\n      Schema ${schema} did not compile.\n`);
+      continue;
+    }
+    if (validate(readJson(join(REPO_ROOT, file)))) {
+      process.stdout.write(`ok    config  ${file}\n`);
+    } else {
+      failures += 1;
+      const detail = validate.errors
+        .map((error) => `      ${error.instancePath || "/"} ${error.message}`)
+        .join("\n");
+      process.stderr.write(`FAIL  config  ${file}  against ${schema}\n${detail}\n`);
+    }
   }
 
   for (const file of samples) {

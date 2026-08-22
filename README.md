@@ -102,9 +102,29 @@ Azure resources are one group per run, tagged with an expiry, removable whole by
 the reaper workflow. The exceptions that genuinely cannot be reversed are listed
 in [docs/REVERSIBILITY.md](docs/REVERSIBILITY.md).
 
+## Connectors
+
+Three optional environments, each with permission tiers, each unlocking specific
+capabilities. Nothing is requested until a capability you enabled needs it.
+
+```bash
+npm run connect                                              # detect what is present
+node scripts/pawprint-connect.mjs --plan microsoft365=read,azure=write
+```
+
+`--plan` models the consent cost and resulting capabilities **without requesting
+anything** — use it to have the permissions conversation before touching the tenant.
+
+Two rules hold throughout: no single app registration collects the union of every
+permission, and **delegated permissions are preferred over application ones**, so
+the connector can never exceed what the signed-in user can already do. Azure
+deployment is restricted to an allowlist of approved subscriptions that fails
+closed. Details in [docs/CONNECTORS.md](docs/CONNECTORS.md).
+
 ## Documentation
 
 - [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
+- [Connectors](docs/CONNECTORS.md) — environments, permission tiers, capability matrix
 - [Identity](docs/IDENTITY.md) — tenants, auth modes, GitHub, and the tradeoffs
 - [Reversibility](docs/REVERSIBILITY.md) — what is touched, what undoes, what does not
 - [Configuration](docs/CONFIGURATION.md) — the five-layer model and its guardrails

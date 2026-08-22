@@ -1,0 +1,273 @@
+{
+  "$schema": "../schema/connectors.schema.json",
+  "catalogVersion": "1.0.0",
+
+  "connectors": {
+    "microsoft365": {
+      "title": "Microsoft 365 and Entra",
+      "description": "Reads detections, incidents and audit events so a pawprint can prove your tooling actually noticed a scenario, rather than asserting it should have.",
+      "identity": "entra",
+      "detect": {
+        "method": "graph",
+        "probe": "https://graph.microsoft.com/v1.0/organization"
+      },
+      "tiers": {
+        "none": {
+          "summary": "Sign-in only. Pawprint knows who you are and nothing else.",
+          "permissions": [],
+          "consent": "user",
+          "reversible": true,
+          "note": "This is the installed default. Every scope used for sign-in is user-consentable, so no admin is involved."
+        },
+        "read": {
+          "summary": "Read security alerts, incidents and audit events as the signed-in user.",
+          "permissions": [
+            {
+              "name": "SecurityEvents.Read.All",
+              "type": "delegated",
+              "rationale": "Confirms a scenario surfaced as a Defender alert, which is the core detect-stage evidence."
+            },
+            {
+              "name": "SecurityIncident.Read.All",
+              "type": "delegated",
+              "rationale": "Correlates alerts into the incident an analyst would actually triage."
+            },
+            {
+              "name": "AuditLog.Read.All",
+              "type": "delegated",
+              "rationale": "Attributes a run to the identity that performed it when building the evidence trail."
+            }
+          ],
+          "consent": "admin",
+          "reversible": true,
+          "note": "Delegated, so the connector can never see more than the signed-in user already can. Graph security scopes require admin consent even when delegated; that is a Microsoft requirement, not a Pawprint one."
+        },
+        "write": {
+          "summary": "Additionally update alert and incident status during the remediate stage.",
+          "permissions": [
+            {
+              "name": "SecurityEvents.ReadWrite.All",
+              "type": "delegated",
+              "rationale": "Closes or annotates the alert a scenario raised, demonstrating the full remediation loop."
+            },
+            {
+              "name": "SecurityIncident.ReadWrite.All",
+              "type": "delegated",
+              "rationale": "Resolves the incident a scenario generated so the queue is left clean."
+            }
+          ],
+          "consent": "admin",
+          "reversible": true,
+          "note": "Only needed if you want Pawprint to close what it opened. Leaving this at read and closing incidents yourself is a defensible choice."
+        },
+        "admin": {
+          "summary": "Unattended, app-only access for scheduled detection polling with no user present.",
+          "permissions": [
+            {
+              "name": "SecurityEvents.Read.All",
+              "type": "application",
+              "rationale": "Allows scheduled evidence collection to continue when detection lags past the interactive session."
+            }
+          ],
+          "consent": "admin",
+          "reversible": true,
+          "note": "Application permission is standing access that ignores Conditional Access and the signed-in user's own limits. Enable it only if you genuinely need unattended polling; delegated read covers interactive use."
+        }
+      }
+    },
+
+    "azure": {
+      "title": "Azure subscriptions",
+      "description": "Deploys scenarios and reads control-plane state. Restricted to an explicit allowlist of approved subscriptions.",
+      "identity": "azure-rbac",
+      "detect": {
+        "method": "arm",
+        "probe": "https://management.azure.com/subscriptions?api-version=2022-12-01"
+      },
+      "tiers": {
+        "none": {
+          "summary": "No Azure access. Scenario deployment is unavailable.",
+          "permissions": [],
+          "consent": "none",
+          "reversible": true
+        },
+        "read": {
+          "summary": "Read resource state to verify assertions, without changing anything.",
+          "permissions": [
+            {
+              "name": "Reader",
+              "type": "azure-role",
+              "scope": "subscription",
+              "rationale": "Verifies control-plane assertions and lets the reaper find expired runs without write access."
+            }
+          ],
+          "consent": "none",
+          "reversible": true,
+          "note": "Assigned only on subscriptions in the approved allowlist. Never at management-group or tenant root."
+        },
+        "write": {
+          "summary": "Create and delete the resources a scenario needs.",
+          "permissions": [
+            {
+              "name": "Contributor",
+              "type": "azure-role",
+              "scope": "resource-group",
+              "rationale": "Creates and tears down scenario resources inside the run's own resource group."
+            }
+          ],
+          "consent": "none",
+          "reversible": true,
+          "note": "Scoped to the run resource group, not the subscription, so the blast radius matches the run."
+        },
+        "admin": {
+          "summary": "Additionally assign roles, required only by scenarios using managed-identity image pull.",
+          "permissions": [
+            {
+              "name": "Role Based Access Control Administrator",
+              "type": "azure-role",
+              "scope": "resource-group",
+              "rationale": "Grants AcrPull to the workload managed identity so images pull without stored credentials."
+            }
+          ],
+          "consent": "none",
+          "reversible": true,
+          "note": "This role can grant other roles, so it is a privilege-escalation path. Avoid it by publishing scenario images to a public registry, or by pre-creating the identity and assignment yourself."
+        }
+      }
+    },
+
+    "github": {
+      "title": "GitHub",
+      "description": "Acts on repositories: reads workflow runs for evidence, opens promotion pull requests, and syncs environment variables from configuration.",
+      "identity": "github",
+      "detect": {
+        "method": "github-api",
+        "probe": "https://api.github.com/user"
+      },
+      "tiers": {
+        "none": {
+          "summary": "No GitHub access. Everything still works through workflows you run yourself.",
+          "permissions": [],
+          "consent": "none",
+          "reversible": true
+        },
+        "read": {
+          "summary": "Read workflow runs and repository metadata.",
+          "permissions": [
+            {
+              "name": "metadata:read",
+              "type": "github-permission",
+              "scope": "repository",
+              "rationale": "Mandatory baseline permission for any GitHub App installation."
+            },
+            {
+              "name": "actions:read",
+              "type": "github-permission",
+              "scope": "repository",
+              "rationale": "Reads workflow run status so a pawprint can record the CI evidence around a run."
+            },
+            {
+              "name": "contents:read",
+              "type": "github-permission",
+              "scope": "repository",
+              "rationale": "Reads scenario manifests and configuration to validate them before deployment."
+            }
+          ],
+          "consent": "none",
+          "reversible": true
+        },
+        "write": {
+          "summary": "Additionally open promotion pull requests and publish scenario images.",
+          "permissions": [
+            {
+              "name": "pull_requests:write",
+              "type": "github-permission",
+              "scope": "repository",
+              "rationale": "Opens and updates the dev to main promotion pull request."
+            },
+            {
+              "name": "packages:write",
+              "type": "github-permission",
+              "scope": "organization",
+              "rationale": "Publishes scenario container images so adopters can run them without provisioning a registry."
+            }
+          ],
+          "consent": "none",
+          "reversible": true
+        },
+        "admin": {
+          "summary": "Additionally sync environment variables from configuration into GitHub Environments.",
+          "permissions": [
+            {
+              "name": "environments:write",
+              "type": "github-permission",
+              "scope": "repository",
+              "rationale": "Projects resolved configuration into GitHub Environment variables so settings stay reviewable in git."
+            }
+          ],
+          "consent": "none",
+          "reversible": true,
+          "note": "Environment variables can gate deployments, so write access here is effectively deployment configuration control. Sync them manually if that is too much."
+        }
+      }
+    }
+  },
+
+  "capabilities": {
+    "evidence.detection-alerts": {
+      "title": "Prove a scenario surfaced as a security alert",
+      "requires": [{ "connector": "microsoft365", "minTier": "read" }],
+      "degraded": "Detect-stage assertions report unknown rather than pass, and the pawprint records that no detection source was connected."
+    },
+    "evidence.audit-attribution": {
+      "title": "Attribute a run to the identity that performed it",
+      "requires": [{ "connector": "microsoft365", "minTier": "read" }],
+      "degraded": "The pawprint records the local operator name only, which is weaker attribution."
+    },
+    "remediate.close-alerts": {
+      "title": "Close the alert a scenario raised",
+      "requires": [{ "connector": "microsoft365", "minTier": "write" }],
+      "degraded": "Alerts are left open for an analyst to close, and the pawprint notes that remediation was infrastructure-only."
+    },
+    "detect.scheduled-poll": {
+      "title": "Keep collecting detection evidence after the session ends",
+      "requires": [{ "connector": "microsoft365", "minTier": "admin" }],
+      "degraded": "Detection evidence is collected only while a run is in progress, so slow detections report unknown."
+    },
+    "verify.control-plane": {
+      "title": "Verify deployed resource state",
+      "requires": [{ "connector": "azure", "minTier": "read" }],
+      "degraded": "Control-plane assertions report unknown and only runtime and HTTP evidence is available."
+    },
+    "deploy.scenario": {
+      "title": "Deploy and tear down scenarios",
+      "requires": [{ "connector": "azure", "minTier": "write" }],
+      "degraded": "Pawprint validates and renders evidence but cannot deploy anything."
+    },
+    "deploy.managed-identity-pull": {
+      "title": "Pull scenario images using a managed identity",
+      "requires": [{ "connector": "azure", "minTier": "admin" }],
+      "degraded": "Scenarios must use a public registry such as GHCR, which is the recommended path anyway."
+    },
+    "reap.expired-runs": {
+      "title": "Automatically delete runs past their expiry",
+      "requires": [{ "connector": "azure", "minTier": "write" }],
+      "degraded": "Expired runs are reported but must be deleted by hand, so cost and exposure depend on someone remembering."
+    },
+    "evidence.workflow-runs": {
+      "title": "Record CI status alongside deployment evidence",
+      "requires": [{ "connector": "github", "minTier": "read" }],
+      "degraded": "The pawprint omits CI correlation and records only what the runner observed directly."
+    },
+    "promote.pull-request": {
+      "title": "Open dev to main promotion pull requests from the console",
+      "requires": [{ "connector": "github", "minTier": "write" }],
+      "degraded": "Run the promotion workflow from GitHub instead; the outcome is identical."
+    },
+    "config.sync-variables": {
+      "title": "Sync GitHub Environment variables from configuration",
+      "requires": [{ "connector": "github", "minTier": "admin" }],
+      "degraded": "Set environment variables by hand; drift detection still reports mismatches."
+    }
+  }
+}

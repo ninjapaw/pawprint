@@ -53,6 +53,33 @@
       }
     },
 
+    "connectors": {
+      "description": "Which connectors are enabled and at which permission tier. Tiers are cumulative and defined in config/connectors.catalog.json. Choose the lowest tier that unlocks what you actually need.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "microsoft365": { "$ref": "#/$defs/tierChoice" },
+        "azure": { "$ref": "#/$defs/tierChoice" },
+        "github": { "$ref": "#/$defs/tierChoice" }
+      }
+    },
+
+    "tierChoice": {
+      "type": "string",
+      "enum": ["none", "read", "write", "admin"],
+      "default": "none"
+    },
+
+    "approvedSubscriptions": {
+      "description": "Allowlist of subscription ids Pawprint may deploy into. Enforced at preflight: a subscription absent from this list is refused before any resource is touched. Absent or empty means nothing is approved, so it fails closed.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+      }
+    },
+
     "sinks": {
       "description": "Where emitted pawprints are written. JSON is always the on-the-wire format; sinks decide durability. Multiple sinks may be active at once.",
       "type": "object",
@@ -239,7 +266,9 @@
           "$ref": "#/$defs/noSecretKeys"
         },
         "sinks": { "$ref": "#/$defs/sinks" },
-        "admin": { "$ref": "#/$defs/admin" }
+        "admin": { "$ref": "#/$defs/admin" },
+        "connectors": { "$ref": "#/$defs/connectors" },
+        "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }
     },
 
@@ -276,7 +305,9 @@
           "$ref": "#/$defs/noSecretKeys"
         },
         "sinks": { "$ref": "#/$defs/sinks" },
-        "admin": { "$ref": "#/$defs/admin" }
+        "admin": { "$ref": "#/$defs/admin" },
+        "connectors": { "$ref": "#/$defs/connectors" },
+        "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }
     }
   }
