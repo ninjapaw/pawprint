@@ -1,0 +1,38 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Local run artifacts. Pawprints may contain subscription, tenant, resource and
+# operator identifiers. Never commit an unredacted pawprint.
+output/
+*.pawprint.json
+!samples/**/*.pawprint.json
+.azure/
+
+# Credentials
+*.pem
+*.key
+*.pfx
+*.p12
+**/credentials/
+**/secrets/
+**/private/
