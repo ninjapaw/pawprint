@@ -19,7 +19,7 @@
 
 import { spawnSync } from "node:child_process";
 import { randomUUID, randomBytes, scryptSync } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { dirname, resolve } from "node:path";
@@ -41,6 +41,26 @@ const APP_ROLES = [
   { value: "Pawprint.Operator", description: "Deploy, remediate and destroy runs." },
   { value: "Pawprint.Reader", description: "View pawprints and configuration." },
 ];
+
+const PAWPRINT_TAG = "pawprint-managed";
+const GRAPH_APP_ID = "00000003-0000-0000-c000-000000000000";
+
+// All four are user-consentable, so the application never needs tenant-wide
+// admin consent and uninstall never has to revoke a consent grant.
+const DELEGATED_SCOPES = {
+  openid: "37f7f235-527c-4136-accd-4a02d197296e",
+  profile: "14dad69e-099b-42c9-810b-d002981feec1",
+  offline_access: "7427e0e9-2fba-42fe-b0c0-848c9e6a8182",
+  "User.Read": "e1fe6dd8-ba31-4d61-89e7-88639da4683d",
+};
+
+const INSTALL_MANIFEST_PATH = resolve(REPO_ROOT, ".pawprint-install.json");
+const instanceId = randomUUID();
+const createdObjects = [];
+
+function recordObject(entry) {
+  createdObjects.push({ ...entry, createdAt: new Date().toISOString() });
+}
 
 const style = {
   head: (text) => `\n\x1b[1m${text}\x1b[0m\n`,
@@ -92,6 +112,49 @@ function az(args, { allowFailure = false } = {}) {
 
 function graph(url, { allowFailure = true } = {}) {
   return az(["rest", "--method", "get", "--url", url, "-o", "json"], { allowFailure });
+}
+
+/**
+ * Graph write. The body is staged in a repo-relative file so no JSON has to pass
+ * through the argument allowlist, and az is invoked with cwd pinned to the repo
+ * so the relative path resolves.
+ */
+function graphWrite(method, url, body) {
+  const relativePath = ".pawprint-graph-body.json";
+  const absolutePath = resolve(REPO_ROOT, relativePath);
+  writeFileSync(absolutePath, JSON.stringify(body));
+  try {
+    assertSafeArgs([url]);
+    const result = spawnSync(
+      AZ_BIN,
+      ["rest", "--method", method, "--url", url, "--headers", "Content-Type=application/json", "--body", `@${relativePath}`, "-o", "json"],
+      { encoding: "utf8", shell: NEEDS_SHELL, cwd: REPO_ROOT },
+    );
+    if (result.status !== 0) {
+      throw new SetupError(`Graph ${method.toUpperCase()} ${url} failed:\n${(result.stderr || result.stdout || "").trim()}`);
+    }
+    const output = (result.stdout || "").trim();
+    return output ? JSON.parse(output) : null;
+  } finally {
+    rmSync(absolutePath, { force: true });
+  }
+}
+
+/** Written so uninstall reverses recorded object ids rather than guessing by name. */
+function writeInstallManifest({ tenantId, operator }) {
+  const manifest = {
+    schemaVersion: "1.0.0",
+    instanceId,
+    tenantId,
+    createdAt: new Date().toISOString(),
+    createdBy: operator ?? "unknown",
+    objects: createdObjects,
+    tenantSettingsModified: [],
+    adminConsentGranted: false,
+    irreversible: [],
+  };
+  writeFileSync(INSTALL_MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+  return manifest;
 }
 
 async function main() {
@@ -265,7 +328,13 @@ async function main() {
     const manifest = {
       displayName: appName,
       signInAudience: "AzureADMyOrg",
-      web: { redirectUris: [redirectUri] },
+      // Tags make every object this wizard creates discoverable later, so uninstall
+      // never has to guess by display name.
+      tags: [PAWPRINT_TAG, `pawprint-instance:${instanceId}`],
+      web: {
+        redirectUris: [redirectUri],
+        implicitGrantSettings: { enableIdTokenIssuance: false, enableAccessTokenIssuance: false },
+      },
       appRoles: APP_ROLES.map((role) => ({
         id: randomUUID(),
         allowedMemberTypes: ["User"],
@@ -274,6 +343,15 @@ async function main() {
         description: role.description,
         isEnabled: true,
       })),
+      // Deliberately minimal. Sign-in needs nothing beyond identifying the user,
+      // and every scope here is user-consentable, so no tenant-wide admin consent
+      // is required and nothing has to be revoked at uninstall.
+      requiredResourceAccess: [
+        {
+          resourceAppId: GRAPH_APP_ID,
+          resourceAccess: Object.values(DELEGATED_SCOPES).map((id) => ({ id, type: "Scope" })),
+        },
+      ],
     };
 
     if (dryRun) {
@@ -282,23 +360,32 @@ async function main() {
       return;
     }
 
-    const manifestPath = resolve(REPO_ROOT, ".pawprint-app-manifest.json");
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-    const created = az(["ad", "app", "create", "--display-name", appName, "-o", "json"]);
+    const created = graphWrite("post", "https://graph.microsoft.com/v1.0/applications", manifest);
     const clientId = created?.appId;
-    if (!clientId) throw new SetupError("Application was created but no appId was returned.");
+    const appObjectId = created?.id;
+    if (!clientId || !appObjectId) throw new SetupError("Application was created but Graph returned no id.");
+    recordObject({ kind: "application", id: appObjectId, appId: clientId, displayName: appName });
 
-    az(["ad", "app", "update", "--id", clientId, "--web-redirect-uris", redirectUri], { allowFailure: true });
-    az(["ad", "sp", "create", "--id", clientId, "-o", "none"], { allowFailure: true });
-    if (requireAssignment) {
-      az(["ad", "sp", "update", "--id", clientId, "--set", "appRoleAssignmentRequired=true"], { allowFailure: true });
+    const servicePrincipal = graphWrite("post", "https://graph.microsoft.com/v1.0/servicePrincipals", {
+      appId: clientId,
+      tags: [PAWPRINT_TAG, `pawprint-instance:${instanceId}`],
+      appRoleAssignmentRequired: requireAssignment,
+    });
+    if (servicePrincipal?.id) {
+      recordObject({ kind: "servicePrincipal", id: servicePrincipal.id, appId: clientId, displayName: appName });
     }
 
-    stdout.write(`   ${style.good("ok")}  Registered ${appName}\n   client id  ${clientId}\n`);
+    stdout.write(
+      `   ${style.good("ok")}  Registered ${appName}\n` +
+        `   client id  ${clientId}\n` +
+        `   app roles  ${APP_ROLES.map((r) => r.value).join(", ")}\n` +
+        `   scopes     openid, profile, offline_access, User.Read (all user-consentable)\n`,
+    );
     stdout.write(
       style.dim(
-        "   No client secret was created. Federated identity credentials are used for CI,\n" +
-          "   and interactive sign-in needs no application credential at all.\n",
+        "   No client secret was created, no admin consent was requested, and no\n" +
+          "   tenant-wide setting was changed. Everything above is recorded in\n" +
+          "   .pawprint-install.json and can be removed with 'npm run uninstall'.\n",
       ),
     );
 
@@ -327,13 +414,21 @@ async function main() {
         style.dim("   These are identifiers, not secrets, and are safe to commit.\n"),
     );
 
+    writeInstallManifest({ tenantId, operator: account.user?.name });
+    stdout.write(
+      `   ${style.good("ok")}  Install manifest written to .pawprint-install.json\n` +
+        style.dim(`   ${createdObjects.length} directory object(s) recorded for reversal.\n`),
+    );
+
     stdout.write(style.head("Next steps"));
     stdout.write(
       "   1. Assign Pawprint.Admin to a group, not to individuals, so your existing\n" +
         "      joiner-mover-leaver process governs access.\n" +
-        "   2. Apply a Conditional Access policy to this application.\n" +
+        "   2. Apply a Conditional Access policy to this application. Pawprint does not\n" +
+        "      create one, because policy is yours to own.\n" +
         "   3. Optionally enable the durable evidence store:\n" +
-        "      modules/evidence-store/main.bicep with immutable: true\n",
+        "      modules/evidence-store/main.bicep with immutable: true\n\n" +
+        style.dim("   To reverse everything: npm run uninstall -- --what-if\n"),
     );
   } finally {
     rl.close();

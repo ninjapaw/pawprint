@@ -84,10 +84,29 @@ For anything you intend to rely on, use `azureBlob` with `immutable: true`. A
 time-based retention policy means a written pawprint cannot be altered or deleted
 before it expires, which is the difference between a log and evidence.
 
+## Reversibility
+
+Adopting Pawprint is a decision you can walk back. In Entra it creates exactly
+one application and its service principal, both tagged and recorded. It never
+modifies tenant-wide settings, never creates Conditional Access policies, never
+creates groups, and never requests admin consent — every scope it asks for is
+user-consentable.
+
+```bash
+npm run uninstall                       # what-if. Shows everything, changes nothing.
+npm run uninstall -- --apply            # remove recorded objects
+npm run uninstall -- --apply --purge    # also empty the 30-day recycle bin
+```
+
+Azure resources are one group per run, tagged with an expiry, removable whole by
+the reaper workflow. The exceptions that genuinely cannot be reversed are listed
+in [docs/REVERSIBILITY.md](docs/REVERSIBILITY.md).
+
 ## Documentation
 
 - [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
 - [Identity](docs/IDENTITY.md) — tenants, auth modes, GitHub, and the tradeoffs
+- [Reversibility](docs/REVERSIBILITY.md) — what is touched, what undoes, what does not
 - [Configuration](docs/CONFIGURATION.md) — the five-layer model and its guardrails
 - [Scenario contract](docs/SCENARIO-CONTRACT.md) — authoring a scenario
 - [Contributing](CONTRIBUTING.md)

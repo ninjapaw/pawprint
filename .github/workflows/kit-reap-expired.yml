@@ -1,0 +1,103 @@
+name: Kit / Reap expired runs
+
+# Reusable. Consumers pin a tag:
+#   uses: ninjapaw/pawprint/.github/workflows/kit-reap-expired.yml@v1
+#
+# Deletes resource groups whose pawprint.expiresAt tag has passed. This is the
+# Azure half of reversibility: a scenario that is never torn down becomes an
+# unbounded bill and an unowned attack surface.
+#
+# Defaults to what-if. Nothing is deleted until apply is true.
+
+on:
+  workflow_call:
+    inputs:
+      apply:
+        description: Actually delete. Leave false to report only.
+        type: boolean
+        default: false
+      environment:
+        description: GitHub Environment supplying the OIDC identity variables.
+        type: string
+        required: true
+      grace-hours:
+        description: Extra hours to wait past expiry before a group is eligible.
+        type: number
+        default: 1
+      max-deletions:
+        description: Safety ceiling. The job fails rather than exceeding it.
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  reap:
+    name: ${{ inputs.apply && 'Reap' || 'Report' }} expired runs
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Authenticate to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Find expired resource groups
+        id: find
+        run: |
+          set -euo pipefail
+          cutoff="$(date -u -d "-${{ inputs.grace-hours }} hours" +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Cutoff: $cutoff"
+
+          # Only groups this tool created are ever considered.
+          az group list --query "[?tags.\"pawprint.managed\"=='true']" -o json > groups.json
+
+          jq --arg cutoff "$cutoff" '
+            [ .[]
+              | select(.tags["pawprint.expiresAt"] != null)
+              | select(.tags["pawprint.expiresAt"] < $cutoff)
+              | { name: .name, expiresAt: .tags["pawprint.expiresAt"],
+                  runId: .tags["pawprint.runId"], scenario: .tags["pawprint.scenario"] } ]
+          ' groups.json > expired.json
+
+          count="$(jq 'length' expired.json)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Expired groups: $count"
+          jq -r '.[] | "  \(.name)  expired \(.expiresAt)  scenario \(.scenario // "none")"' expired.json
+
+      - name: Enforce the deletion ceiling
+        if: steps.find.outputs.count != '0'
+        run: |
+          if [ "${{ steps.find.outputs.count }}" -gt "${{ inputs.max-deletions }}" ]; then
+            echo "::error::${{ steps.find.outputs.count }} groups exceed the ceiling of ${{ inputs.max-deletions }}."
+            echo "Review them before proceeding; a large batch usually means a tagging or clock problem, not genuine expiry."
+            exit 1
+          fi
+
+      - name: Delete expired groups
+        if: ${{ inputs.apply && steps.find.outputs.count != '0' }}
+        run: |
+          set -euo pipefail
+          jq -r '.[].name' expired.json | while read -r group; do
+            echo "Deleting $group"
+            az group delete --name "$group" --yes --no-wait
+          done
+          echo "::notice::Deletion started for ${{ steps.find.outputs.count }} resource group(s)."
+
+      - name: Report only
+        if: ${{ !inputs.apply }}
+        run: |
+          echo "::notice::What-if run. ${{ steps.find.outputs.count }} group(s) are eligible for deletion."
+          echo "Re-run with apply: true to delete them."
+
+      - name: Upload the reaping report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reap-report-${{ inputs.environment }}
+          path: expired.json
+          if-no-files-found: ignore
