@@ -36,6 +36,11 @@ Adopters edit **only** `config/deploy.config.json`.
 Keeping the files separate is what lets a fork track upstream indefinitely
 without merge conflicts. Start from `config/deploy.config.example.json`.
 
+`config/deploy.config.json` is git-ignored **in this repository**, so the
+maintainers' own tenant and resource names never land upstream. In your fork it
+is normally the opposite: commit it, because it is your environment definition and
+it contains no secrets. Un-ignore it in your fork's `.gitignore`.
+
 ## Guardrails
 
 The resolver rejects, with a non-zero exit and an actionable message:

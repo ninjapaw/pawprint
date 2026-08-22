@@ -53,6 +53,150 @@
       }
     },
 
+    "sinks": {
+      "description": "Where emitted pawprints are written. JSON is always the on-the-wire format; sinks decide durability. Multiple sinks may be active at once.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "description": "Local filesystem. Always available, including air-gapped. Not durable beyond the machine.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "directory": { "type": "string", "default": "output" },
+            "archive": {
+              "description": "Keep timestamped copies of previous runs alongside the current one.",
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "githubArtifact": {
+          "description": "Upload as a workflow artifact. Convenient in CI but bounded by the repository retention window, so unsuitable as the system of record.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "retentionDays": { "type": "integer", "minimum": 1, "maximum": 400 }
+          }
+        },
+        "azureBlob": {
+          "description": "Durable evidence store. Recommended system of record. Write-once semantics are what make a pawprint evidence rather than a log, so immutability is enabled by default.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "accountName": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{3,24}$"
+            },
+            "containerName": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{2,62}$",
+              "default": "pawprints"
+            },
+            "immutable": {
+              "description": "Apply a time-based retention policy so a written pawprint cannot be altered or deleted before it expires.",
+              "type": "boolean",
+              "default": true
+            },
+            "retentionDays": {
+              "description": "Immutability window. Choose to match your audit obligation; it cannot be shortened once locked.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650,
+              "default": 365
+            },
+            "redactBeforeUpload": {
+              "description": "Mask subscription, tenant, resource and operator identifiers before the pawprint leaves the runner.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+              "then": { "required": ["accountName"] }
+            }
+          ]
+        }
+      }
+    },
+
+    "admin": {
+      "description": "Identity configuration for the setup wizard and admin console. The public pawprint viewer has no auth and no backend; this section does not apply to it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "description": "entra: workforce tenant sign-in, recommended. local: generated credential bound to loopback, for air-gapped or no-Azure use. entra-external: CIAM tenant, advanced and generally discouraged for admin consoles.",
+          "type": "string",
+          "enum": ["entra", "local", "entra-external"],
+          "default": "entra"
+        },
+        "tenantId": {
+          "description": "Directory the admin console authenticates against. Empty means auto-detect the tenant bound to the subscription.",
+          "type": "string",
+          "pattern": "^$|^[0-9a-fA-F-]{36}$"
+        },
+        "clientId": {
+          "description": "Application (client) ID of the admin app registration. Not a secret.",
+          "type": "string",
+          "pattern": "^$|^[0-9a-fA-F-]{36}$"
+        },
+        "authority": {
+          "description": "Authority host. Workforce tenants use login.microsoftonline.com; external tenants use <tenant>.ciamlogin.com.",
+          "type": "string"
+        },
+        "credential": {
+          "description": "How the app proves its identity. Federated credentials and certificates are preferred; client secrets are discouraged and never stored in config.",
+          "type": "string",
+          "enum": ["federated", "certificate", "none"],
+          "default": "federated"
+        },
+        "requireAssignment": {
+          "description": "Only users or groups explicitly assigned to the application may sign in.",
+          "type": "boolean",
+          "default": true
+        },
+        "appRoles": {
+          "description": "Role names expected in the token. Authorization decisions read these claims.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["Pawprint.Admin", "Pawprint.Operator", "Pawprint.Reader"] }
+        },
+        "bindAddress": {
+          "description": "Interface the local console binds to. Loopback is the default and changing it exposes the console to the network.",
+          "type": "string",
+          "default": "127.0.0.1"
+        },
+        "sessionMinutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 480,
+          "default": 60
+        },
+        "github": {
+          "description": "Optional GitHub App used to act on repositories. This is resource authorization, not a sign-in method.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "appId": { "type": "string" },
+            "installationId": { "type": "string" },
+            "enterpriseSlug": { "type": "string" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "entra" } }, "required": ["mode"] },
+          "then": { "required": ["tenantId", "clientId"] }
+        }
+      ]
+    },
+
     "settings": {
       "type": "object",
       "$ref": "#/$defs/noSecretKeys",
@@ -93,7 +237,9 @@
           "description": "Scenario parameter overrides, validated against the target scenario's own schema at preflight.",
           "type": "object",
           "$ref": "#/$defs/noSecretKeys"
-        }
+        },
+        "sinks": { "$ref": "#/$defs/sinks" },
+        "admin": { "$ref": "#/$defs/admin" }
       }
     },
 
@@ -128,7 +274,9 @@
         "parameters": {
           "type": "object",
           "$ref": "#/$defs/noSecretKeys"
-        }
+        },
+        "sinks": { "$ref": "#/$defs/sinks" },
+        "admin": { "$ref": "#/$defs/admin" }
       }
     }
   }

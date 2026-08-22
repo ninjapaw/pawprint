@@ -36,3 +36,10 @@ output/
 **/credentials/
 **/secrets/
 **/private/
+
+# Local admin credential hash and transient app manifests written by the setup wizard
+.pawprint-local-admin.json
+.pawprint-app-manifest.json
+
+# Adopter-owned configuration override, which carries environment-specific names
+config/deploy.config.json

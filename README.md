@@ -36,6 +36,7 @@ the primary artifact and the deployment as the means of producing it.
 ```bash
 npm ci
 npm test
+npm run setup          # detect your tenant, register the admin app, write config
 ```
 
 ```bash
@@ -46,9 +47,47 @@ node scripts/pawprint-config.mjs --environment dev
 node scripts/validate-scenario.mjs "scenarios/**/scenario.json"
 ```
 
+## Identity
+
+Three planes, deliberately different postures:
+
+| Plane | Exposure | Authentication |
+|---|---|---|
+| Pawprint viewer | Public or static | None. It stores nothing. |
+| Setup and admin console | Loopback only | Entra, or a generated local credential |
+| Hosted team console | Internal | Entra with app roles |
+
+**Use your existing workforce Entra tenant.** Do not create an External ID tenant
+for an admin console: External ID gives you 7-day log retention, no Identity
+Protection, no PIM, sharply reduced Conditional Access, and MAU billing for every
+admin. Invite external collaborators as B2B guests instead. Full comparison in
+[docs/IDENTITY.md](docs/IDENTITY.md).
+
+Running without Entra is supported. You keep every deployment, scenario and
+evidence capability, and lose SSO, MFA, Conditional Access, PIM, group-based
+roles, centralised revocation, and per-user attribution in the pawprint. A shared
+local credential turns "who ran this" into "someone with the credential", which
+weakens every pawprint that machine emits.
+
+## Evidence storage
+
+Pawprints are JSON — portable, diffable, schema-validated, readable with no
+server. Where they are kept is configurable:
+
+| Sink | Durability | Use |
+|---|---|---|
+| `file` | Machine-local | Always on; works air-gapped |
+| `githubArtifact` | Repository retention window | Convenient in CI; not a system of record |
+| `azureBlob` | Durable, optionally immutable | Recommended system of record |
+
+For anything you intend to rely on, use `azureBlob` with `immutable: true`. A
+time-based retention policy means a written pawprint cannot be altered or deleted
+before it expires, which is the difference between a log and evidence.
+
 ## Documentation
 
 - [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
+- [Identity](docs/IDENTITY.md) — tenants, auth modes, GitHub, and the tradeoffs
 - [Configuration](docs/CONFIGURATION.md) — the five-layer model and its guardrails
 - [Scenario contract](docs/SCENARIO-CONTRACT.md) — authoring a scenario
 - [Contributing](CONTRIBUTING.md)

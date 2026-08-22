@@ -13,6 +13,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "setup": "node scripts/pawprint-setup.mjs",
     "config:check": "node scripts/pawprint-config.mjs --check --environment dev && node scripts/pawprint-config.mjs --check --environment prod",
     "schema:check": "node scripts/validate-schemas.mjs",
     "scenario:check": "node scripts/validate-scenario.mjs samples/*.scenario.json",
