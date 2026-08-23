@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Deploy it. Prove it. Leave a pawprint. Reproducible Azure scenarios with portable, auditable evidence for every deploy-detect-remediate run.",
   "license": "MIT",
-  "author": "Dr Bill Mcilhargey",
+  "author": "Microsoft Corporation",
   "repository": {
     "type": "git",
     "url": "https://github.com/ninjapaw/pawprint.git"
