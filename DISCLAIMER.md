@@ -47,7 +47,6 @@ LICENSE file, when present. The license for one Ninja Paws repository does not
 automatically apply to another repository, and no repository license grants rights
 to Microsoft, GitHub, or third-party trademarks.
 
-This notice applies to Ninja Paws community repositories. It does not describe
-Microsoft-owned repositories, such as microsoft/zerotrustassessment, which are
-governed by their own repository notices, contribution terms, support policies,
-and licenses.
+This notice applies to Ninja Paws community repositories. Other repositories are
+governed by their own notices, contribution terms, support policies, and
+licenses.
