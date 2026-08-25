@@ -1,7 +1,7 @@
 name: Kit / Reap expired runs
 
-# Reusable. Consumers pin a tag:
-#   uses: ninjapaw/pawprint/.github/workflows/kit-reap-expired.yml@v1
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-reap-expired.yml@<immutable-ref>
 #
 # Deletes resource groups whose pawprint.expiresAt tag has passed. This is the
 # Azure half of reversibility: a scenario that is never torn down becomes an

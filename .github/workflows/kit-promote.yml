@@ -1,7 +1,7 @@
 name: Kit / Promote dev to main
 
-# Reusable. Consumers pin a tag:
-#   uses: ninjapaw/pawprint/.github/workflows/kit-promote.yml@v1
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-promote.yml@<immutable-ref>
 #
 # Opens or reuses a dev -> main promotion pull request. Refuses to promote a
 # branch whose CI has not passed, so a broken dev never reaches production

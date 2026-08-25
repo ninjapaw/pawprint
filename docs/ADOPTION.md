@@ -6,13 +6,13 @@ How another repository consumes Pawprint.
 
 | Piece | How you consume it |
 |---|---|
-| Reusable workflows | `uses: ninjapaw/pawprint/.github/workflows/kit-*.yml@v1` |
+| Reusable workflows | `uses: ninjapaw/pawprint/.github/workflows/kit-*.yml@<immutable-ref>` |
 | Schemas | `$schema` reference, or the validators in CI |
 | Bicep modules | `module ... '<path>/modules/...'` after vendoring or submoduling |
 | Config resolver | `node scripts/pawprint-config.mjs` |
 
-Always pin a tag. Never track a branch: `dev` is where work lands first and will
-break you.
+Always pin an immutable ref (release tag or commit SHA). Never track a branch:
+`dev` is where work lands first and will break you.
 
 ## 1. Configuration
 
@@ -67,12 +67,12 @@ permissions:
 
 jobs:
   scenarios:
-    uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@v1
+    uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@<immutable-ref>
     with:
       scenario-glob: "scenarios/**/scenario.json"
 
   infrastructure:
-    uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@v1
+    uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
     with:
       bicep-glob: "infra/**/*.bicep"
       check-committed-arm: true
@@ -97,7 +97,7 @@ permissions:
 
 jobs:
   promote:
-    uses: ninjapaw/pawprint/.github/workflows/kit-promote.yml@v1
+    uses: ninjapaw/pawprint/.github/workflows/kit-promote.yml@<immutable-ref>
     with:
       require-ci: true
 ```

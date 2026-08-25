@@ -1,7 +1,7 @@
 name: Kit / Bicep validate
 
-# Reusable. Consumers pin a tag:
-#   uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@v1
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
 #
 # Compiles every Bicep file and, where a compiled ARM template is committed
 # alongside it, proves the two are in sync. A committed artifact that is not

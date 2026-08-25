@@ -1,7 +1,7 @@
 name: Kit / Scenario validate
 
-# Reusable. Consumers pin a tag:
-#   uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@v1
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@<immutable-ref>
 #
 # Validates every scenario manifest in the calling repository against the
 # Pawprint scenario schema and the catalog safety policy: bounded lifetime,
