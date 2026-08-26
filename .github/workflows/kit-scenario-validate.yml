@@ -16,9 +16,9 @@ on:
         type: string
         default: "scenarios/**/scenario.json"
       pawprint-ref:
-        description: Tag, branch or SHA of ninjapaw/pawprint supplying the schema and validator.
+        description: Immutable release tag or commit SHA of ninjapaw/pawprint supplying the schema and validator.
         type: string
-        default: v1
+        required: true
       require-at-least-one:
         description: Fail when the glob matches no scenarios, rather than passing vacuously.
         type: boolean
@@ -44,9 +44,25 @@ jobs:
           ref: ${{ inputs.pawprint-ref }}
           path: pawprint
 
+      - name: Validate Pawprint reference and tool contract
+        env:
+          PAWPRINT_REF: ${{ inputs.pawprint-ref }}
+        run: |
+          case "$PAWPRINT_REF" in
+            dev|main|v1|latest)
+              echo "::error::pawprint-ref must be an immutable release tag or commit SHA, not '$PAWPRINT_REF'."
+              exit 1
+              ;;
+          esac
+          git -C pawprint rev-parse --verify HEAD >/dev/null
+          test -s pawprint/.node-version || {
+            echo "::error::The referenced Pawprint revision must contain .node-version."
+            exit 1
+          }
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: pawprint/.node-version
           cache: npm
           cache-dependency-path: pawprint/package-lock.json
 
