@@ -11,7 +11,7 @@ deploys a known state, proves what was observed, records detection and
 remediation evidence, and tears the run down when it expires.
 
 ```text
-provision -> build -> deploy -> detect -> remediate -> verify -> destroy
+provision -> build -> deploy -> arm -> detect -> remediate -> verify -> destroy
 ```
 
 The output is a portable, schema-validated **pawprint**: a signed, diffable
