@@ -31,7 +31,7 @@ the primary artifact and the deployment as the means of producing it.
 | Component | Purpose |
 |---|---|
 | `schema/` | The pawprint, scenario, and deployment-config contracts |
-| `.github/workflows/kit-*.yml` | Reusable workflows, pinned by consumers at `@v1` |
+| `.github/workflows/kit-*.yml` | Reusable workflows, pinned by consumers at an immutable ref (release tag or commit SHA) |
 | `platform/` | Subscription-scope baseline: run resource group, tag schema, TTL stamp |
 | `modules/` | Shared Bicep modules |
 | `scripts/` | Config resolver, scenario validator, policy and guardrail tests |
