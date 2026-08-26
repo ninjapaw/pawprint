@@ -302,7 +302,7 @@ async function main() {
       style.dim(
         "   entra           Workforce tenant sign-in. Recommended.\n" +
           "   local           Generated credential bound to 127.0.0.1. Air-gapped or no-Azure use.\n" +
-          "   entra-external  External ID (CIAM) tenant. Advanced; see docs/IDENTITY.md.\n",
+          "   entra-external  External ID (CIAM) tenant. Advanced; see README.md.\n",
       ),
     );
     const mode = values.mode ?? (await ask("   Mode", "entra"));
@@ -319,7 +319,7 @@ async function main() {
           "\n   External ID tenants have 7-day log retention, no Identity Protection,\n" +
             "   no PIM, sharply reduced Conditional Access, and MAU billing for every\n" +
             "   admin. For an admin console this is usually the wrong choice.\n" +
-            "   See docs/IDENTITY.md for the full comparison.\n",
+            "   See README.md for the identity guidance.\n",
         ),
       );
       if (!(await confirm("   Continue with an external tenant anyway?", "n"))) {
@@ -368,7 +368,7 @@ async function main() {
           "     Workforce tenant:  https://entra.microsoft.com  >  Manage tenants  >  Create\n" +
           "     External tenant:   az rest --method post \\\n" +
           "       --url https://graph.microsoft.com/beta/tenantRelationships/managedTenants\n\n" +
-          "   Before you do, read docs/IDENTITY.md. In almost every case the tenant\n" +
+          "   Before you do, read README.md. In almost every case the tenant\n" +
           "   already bound to your subscription is the correct answer.\n",
       );
       throw new SetupError("No directory selected.");

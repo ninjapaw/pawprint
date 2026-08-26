@@ -2,164 +2,239 @@
 
 **Deploy it. Prove it. Leave a pawprint.**
 
-> **Independent community project.** This repository is not a Microsoft product,
-> assessment, endorsement, or official deployment guidance. Some contributors may
-> be Microsoft employees acting in an individual or community capacity. Use at
-> your own risk and validate all deployments, evidence, and recommendations
-> before using them in any environment. See [DISCLAIMER.md](DISCLAIMER.md).
+> Independent community project. Pawprint is not a Microsoft product, official
+> assessment, endorsement, or deployment guide. Validate all deployments and
+> recommendations before using them. See [DISCLAIMER.md](DISCLAIMER.md).
 
-Pawprint is an open platform for reproducible cloud scenarios on Azure. It deploys
-a known state, proves your tooling detected it, remediates, and proves the
-detection cleared — emitting a portable evidence artifact for every run.
-
-That artifact is a **pawprint**: a signed, diffable, shareable record of what was
-deployed, what was asserted, and what was observed.
+Pawprint is an Azure platform for reproducible cloud-security scenarios. It
+deploys a known state, proves what was observed, records detection and
+remediation evidence, and tears the run down when it expires.
 
 ```text
-provision → arm → detect → remediate → verify → destroy
-     └──────────── every stage recorded in the pawprint ────────────┘
+provision -> build -> deploy -> detect -> remediate -> verify -> destroy
 ```
 
-## Why
+The output is a portable, schema-validated **pawprint**: a signed, diffable
+record of what was deployed, asserted, and observed.
 
-Deploying infrastructure is a solved problem. *Proving* that a control fired — and
-being able to hand someone the evidence — is not. Pawprint treats the evidence as
-the primary artifact and the deployment as the means of producing it.
+## What is included
 
-## What is in the box
-
-| Component | Purpose |
-|---|---|
-| `schema/` | The pawprint, scenario, and deployment-config contracts |
-| `.github/workflows/kit-*.yml` | Reusable workflows, pinned by consumers at an immutable ref (release tag or commit SHA) |
-| `platform/` | Subscription-scope baseline: run resource group, tag schema, TTL stamp |
-| `modules/` | Shared Bicep modules |
-| `scripts/` | Config resolver, scenario validator, policy and guardrail tests |
-| `samples/` | Reference pawprint and scenario fixtures |
+| Path | Purpose |
+| --- | --- |
+| `schema/` | Pawprint, scenario, connector, and deployment-config contracts |
+| `platform/` | Subscription-scope run resource group, tags, and expiry metadata |
+| `modules/` | Reusable Bicep modules |
+| `scripts/` | Configuration, setup, validation, connector, doctor, and uninstall tooling |
+| `.github/workflows/kit-*.yml` | Reusable validation, promotion, and cleanup workflows |
+| `samples/` | Reference scenario and pawprint fixtures |
 
 ## Quick start
+
+Requirements: Node.js 22.12+, npm, Azure CLI for Azure operations, and GitHub
+CLI for GitHub integration.
 
 ```bash
 npm ci
 npm test
-npm run doctor         # read-only preflight: tooling, sign-in, config, CI trust
-npm run setup          # detect your tenant, register the admin app, federate CI
+npm run doctor
 ```
 
-```bash
-# Resolve configuration for an environment
-node scripts/pawprint-config.mjs --environment dev
+For first-time setup:
 
-# Validate scenario manifests against schema and safety policy
+```bash
+npm run setup
+```
+
+The setup wizard creates the Entra application and GitHub OIDC trust required
+for the selected environments. It creates no client secret. Review the preview
+and use your existing workforce Entra tenant; do not create a new tenant for
+this tool.
+
+## Configuration
+
+Configuration is resolved in this order, with later values taking precedence:
+
+```text
+builtin < config/deploy.defaults.json < config/deploy.config.json
+         < environment variables < CLI flags
+```
+
+Adopters copy `config/deploy.config.example.json` to
+`config/deploy.config.json`. Keep subscription IDs out of committed files;
+provide them through GitHub Environment variables or a runtime override.
+
+```bash
+node scripts/pawprint-config.mjs --environment dev
+node scripts/pawprint-config.mjs --environment dev --check
+node scripts/pawprint-config.mjs --branch dev --github-env
+```
+
+Committed configuration is schema-validated and fails closed. Secret-shaped
+values are rejected, subscriptions must be explicitly approved, and
+environment branches are isolated (`dev` to `dev`, `prod` to `main`). Runtime
+secrets belong in Azure Key Vault. Pipeline identity belongs in GitHub
+Environment variables, not repository files or long-lived client secrets.
+
+## Identity and permissions
+
+Pawprint has three separate planes:
+
+| Plane | Default posture |
+| --- | --- |
+| Viewer | Static/client-side and unauthenticated; stores nothing |
+| Local setup/admin console | Loopback-only, using workforce Entra or a local fallback credential |
+| Hosted team console | Internal deployment protected by workforce Entra app roles |
+
+Use the existing workforce Entra tenant so Conditional Access, MFA, Identity
+Protection, PIM, audit retention, and group-based access remain in one place.
+Assign app roles to groups where possible:
+
+| Role | Responsibility |
+| --- | --- |
+| `Pawprint.Admin` | Configure identity, sinks, environments, and destructive operations |
+| `Pawprint.Operator` | Deploy, remediate, verify, and destroy runs |
+| `Pawprint.Reader` | View pawprints and configuration |
+
+GitHub repository actions are separate from human sign-in. Prefer a GitHub App
+for repository automation. If using reusable workflows, pin an immutable
+release tag or commit SHA, never a branch:
+
+```yaml
+uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
+```
+
+## Evidence and storage
+
+Pawprints are JSON and remain portable regardless of where they are stored.
+
+| Sink | Use |
+| --- | --- |
+| `file` | Local, offline, or air-gapped runs |
+| `githubArtifact` | Convenient CI retention; not a system of record |
+| `azureBlob` | Durable evidence storage; enable immutability for relied-on evidence |
+
+Use `azureBlob` with `immutable: true` when evidence must be tamper-resistant.
+The configured retention policy prevents alteration or deletion before expiry.
+Redact subscription IDs, tenant IDs, resource IDs, hostnames, and operator
+identity before sharing pawprints outside the owning organization.
+
+## Scenario contract
+
+A scenario is data plus its infrastructure, not runner-specific code:
+
+```text
+scenarios/<id>/
+  scenario.json
+  infra/main.bicep
+  payload/
+  README.md
+```
+
+Every scenario must declare its lifecycle, cost, TTL, ingress justification,
+parameters, assertions, and remediation behavior. `destroy` is mandatory.
+Assertions should read from reality, in this order of evidence strength:
+
+```text
+runtime > control-plane/http/registry > external > config
+```
+
+Do not use configuration intent as proof of a running state. Asynchronous
+observations may report `unknown` until the service has had time to converge.
+
+Validate a scenario with:
+
+```bash
 node scripts/validate-scenario.mjs "scenarios/**/scenario.json"
 ```
 
-## Identity
-
-Three planes, deliberately different postures:
-
-| Plane | Exposure | Authentication |
-|---|---|---|
-| Pawprint viewer | Public or static | None. It stores nothing. |
-| Setup and admin console | Loopback only | Entra, or a generated local credential |
-| Hosted team console | Internal | Entra with app roles |
-
-**Use your existing workforce Entra tenant.** Do not create an External ID tenant
-for an admin console: External ID gives you 7-day log retention, no Identity
-Protection, no PIM, sharply reduced Conditional Access, and MAU billing for every
-admin. Invite external collaborators as B2B guests instead. Full comparison in
-[docs/IDENTITY.md](docs/IDENTITY.md).
-
-Running without Entra is supported. You keep every deployment, scenario and
-evidence capability, and lose SSO, MFA, Conditional Access, PIM, group-based
-roles, centralised revocation, and per-user attribution in the pawprint. A shared
-local credential turns "who ran this" into "someone with the credential", which
-weakens every pawprint that machine emits.
-
-## Evidence storage
-
-Pawprints are JSON — portable, diffable, schema-validated, readable with no
-server. Where they are kept is configurable:
-
-| Sink | Durability | Use |
-|---|---|---|
-| `file` | Machine-local | Always on; works air-gapped |
-| `githubArtifact` | Repository retention window | Convenient in CI; not a system of record |
-| `azureBlob` | Durable, optionally immutable | Recommended system of record |
-
-For anything you intend to rely on, use `azureBlob` with `immutable: true`. A
-time-based retention policy means a written pawprint cannot be altered or deleted
-before it expires, which is the difference between a log and evidence.
-
-## Reversibility
-
-Adopting Pawprint is a decision you can walk back. In Entra it creates exactly
-one application and its service principal, both tagged and recorded. It never
-modifies tenant-wide settings, never creates Conditional Access policies, never
-creates groups, and never requests admin consent — every scope it asks for is
-user-consentable.
-
-```bash
-npm run uninstall                       # what-if. Shows everything, changes nothing.
-npm run uninstall -- --apply            # remove recorded objects
-npm run uninstall -- --apply --purge    # also empty the 30-day recycle bin
-```
-
-Azure resources are one group per run, tagged with an expiry, removable whole by
-the reaper workflow. The exceptions that genuinely cannot be reversed are listed
-in [docs/REVERSIBILITY.md](docs/REVERSIBILITY.md).
+Scenario infrastructure is deployed in two phases: the subscription-scope
+platform baseline creates one tagged run resource group, then the scenario is
+deployed at resource-group scope. Bicep parameter files (`.bicepparam`) are
+preferred because they are type-checked.
 
 ## Connectors
 
-Three optional environments, each with permission tiers, each unlocking specific
-capabilities. Nothing is requested until a capability you enabled needs it.
+Connectors are optional and permission-tiered. Start with the lowest tier that
+unlocks the capability you need:
+
+| Tier | Meaning |
+| --- | --- |
+| `none` | Identity only or disconnected |
+| `read` | Observe; no changes |
+| `write` | Act within the intended resource boundary |
+| `admin` | Elevated or app-only access; avoid unless required |
 
 ```bash
-npm run connect                                              # detect what is present
+npm run connect
 node scripts/pawprint-connect.mjs --plan microsoft365=read,azure=write
 ```
 
-`--plan` models the consent cost and resulting capabilities **without requesting
-anything** — use it to have the permissions conversation before touching the tenant.
+The planner previews consent and capabilities without requesting permissions.
+Delegated access is preferred. Azure write access is scoped to the run resource
+group; approved subscriptions are an explicit allowlist and an empty list
+approves nothing. Publishing images to GHCR can avoid the elevated managed
+identity pull permission.
 
-Two rules hold throughout: no single app registration collects the union of every
-permission, and **delegated permissions are preferred over application ones**, so
-the connector can never exceed what the signed-in user can already do. Azure
-deployment is restricted to an allowlist of approved subscriptions that fails
-closed. Details in [docs/CONNECTORS.md](docs/CONNECTORS.md).
+## Lifecycle and cleanup
 
-## Documentation
+Every Azure run is bounded by a tagged resource group and expiry stamp. The
+reaper only considers Pawprint-managed groups and has a deletion limit.
 
-- [Adoption](docs/ADOPTION.md) — consuming Pawprint from another repository
-- [Infrastructure as code](docs/IAC.md) — why Bicep, why no state file, linting and what-if
-- [Connectors](docs/CONNECTORS.md) — environments, permission tiers, capability matrix
-- [Identity](docs/IDENTITY.md) — tenants, auth modes, GitHub, and the tradeoffs
-- [Reversibility](docs/REVERSIBILITY.md) — what is touched, what undoes, what does not
-- [Configuration](docs/CONFIGURATION.md) — the five-layer model and its guardrails
-- [Scenario contract](docs/SCENARIO-CONTRACT.md) — authoring a scenario
-- [Contributing](CONTRIBUTING.md)
+```bash
+npm run doctor
+npm run uninstall                    # preview only
+npm run uninstall -- --apply         # remove recorded objects
+npm run uninstall -- --apply --purge # also purge the recycle bin
+```
 
-## Design rules
+Uninstall uses recorded object IDs, not display-name matching. What-if is the
+default. Entra-deleted applications remain restorable for 30 days unless the
+explicit purge option is used. Immutable evidence and subscription-wide
+Defender plan activation may not be immediately reversible.
 
-1. **Evidence over output.** Every run emits a pawprint conforming to a versioned schema.
-2. **Assert from reality.** Detection is computed from the running system, never from the variable that requested it.
-3. **Config is code.** Anything shared lives in a schema-validated file, not a settings page.
-4. **No long-lived credentials.** OIDC federation only.
-5. **Bounded by default.** Every scenario declares TTL, cost, and blast radius, and tears itself down.
-6. **The viewer stores nothing.** No accounts, no backend, no telemetry.
-7. **Guardrails are tested as negative cases.** One that never fires is worse than none.
+## CI and adoption
 
-## Status
+Run the local checks before opening a pull request:
 
-Early. The schemas are the stable surface; treat everything else as moving.
+```bash
+npm test
+```
 
-`main` is production. `dev` is where work lands first.
+Consumers can adopt the reusable kits from another repository:
 
-## Consumers
+```yaml
+jobs:
+  scenarios:
+    uses: ninjapaw/pawprint/.github/workflows/kit-scenario-validate.yml@<immutable-ref>
+    with:
+      scenario-glob: "scenarios/**/scenario.json"
 
-- [ninjapaws-cloud-security-dojo](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo) — flagship scenario catalog
+  infrastructure:
+    uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
+    with:
+      bicep-glob: "infra/**/*.bicep"
+      check-committed-arm: true
+```
 
-## License
+Use `check-committed-arm` whenever generated ARM templates are committed.
+Promotion is intentionally pull-request based and should require successful CI
+before `dev` is promoted to `main`.
 
-MIT. See [LICENSE](LICENSE). Ninja Paw is an independent community project; no
-Microsoft endorsement is implied.
+## Design commitments
+
+- Evidence is the product; deployment is how it is produced.
+- Assertions come from observed reality, not requested intent.
+- Configuration is code and is schema-validated.
+- OIDC is preferred over long-lived credentials.
+- Scenarios are bounded by TTL, cost, blast radius, and teardown.
+- The viewer stores nothing and has no backend.
+- Negative guardrail tests are part of the contract.
+
+## Project status
+
+Pawprint is early-stage. Schemas are the most stable public surface; runners,
+modules, and workflows continue to evolve. The flagship consumer is
+[ninjapaws-cloud-security-dojo](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo).
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), and [LICENSE](LICENSE).

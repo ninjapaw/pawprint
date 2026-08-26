@@ -37,8 +37,8 @@ test proving it rejects the bad input, and every suite needs a positive control
 proving it still accepts good input.
 
 **Assert from reality.** Evidence must be observed from the running system, not
-read back from the configuration that requested it. See
-[docs/SCENARIO-CONTRACT.md](SCENARIO-CONTRACT.md).
+ read back from the configuration that requested it. See the scenario contract
+ section in [README.md](README.md#scenario-contract).
 
 **Generated artifacts are regenerated in the same pull request.** A committed ARM
 template that drifts from its Bicep source is not generated, it is a fork.
