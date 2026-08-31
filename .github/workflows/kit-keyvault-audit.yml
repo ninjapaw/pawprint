@@ -46,6 +46,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require the Azure identity variables
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Variable $name is not set. These are GitHub Variables, not Secrets: with OIDC there is no client secret, and masking an identifier only redacts it out of the deployment log."
+              exit 1
+            fi
+          done
+
       - name: Authenticate to Azure
         uses: azure/login@v2
         with:
