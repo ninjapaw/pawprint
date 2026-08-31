@@ -269,16 +269,16 @@ Where a value lives is decided by how widely it is identical and whether it is
 actually a credential. Duplicating a value across repositories means rotating it
 in several places and eventually missing one.
 
-| Value                             | Scope                 | Kind     | Why                                                                       |
-| --------------------------------- | --------------------- | -------- | ------------------------------------------------------------------------- |
-| `AZURE_TENANT_ID`                 | Organisation          | Variable | One directory for the whole organisation                                  |
-| `AZURE_LOCATION`                  | Organisation          | Variable | Same region everywhere; a repository or environment may still override it |
-| `AZURE_CLIENT_ID`                 | Environment           | Variable | One app registration per repository per environment                       |
-| `AZURE_SUBSCRIPTION_ID`           | Environment           | Variable | Dev and production are different subscriptions                            |
-| `AZURE_RESOURCE_GROUP` and names  | Environment           | Variable | Differ per environment                                                    |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Environment           | Secret   | Grants publish rights to one specific site                                |
-| Workload API keys                 | Environment           | Secret   | Belong to one service                                                     |
-| DNS provider tokens               | Organisation, scoped  | Secret   | Same credential wherever custom domains are validated                     |
+| Value                             | Scope                | Kind     | Why                                                                       |
+| --------------------------------- | -------------------- | -------- | ------------------------------------------------------------------------- |
+| `AZURE_TENANT_ID`                 | Organisation         | Variable | One directory for the whole organisation                                  |
+| `AZURE_LOCATION`                  | Organisation         | Variable | Same region everywhere; a repository or environment may still override it |
+| `AZURE_CLIENT_ID`                 | Environment          | Variable | One app registration per repository per environment                       |
+| `AZURE_SUBSCRIPTION_ID`           | Environment          | Variable | Dev and production are different subscriptions                            |
+| `AZURE_RESOURCE_GROUP` and names  | Environment          | Variable | Differ per environment                                                    |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Environment          | Secret   | Grants publish rights to one specific site                                |
+| Workload API keys                 | Environment          | Secret   | Belong to one service                                                     |
+| DNS provider tokens               | Organisation, scoped | Secret   | Same credential wherever custom domains are validated                     |
 
 The three Azure identity values are **Variables, not Secrets**. With OIDC
 federated credentials there is no client secret; the client id is the public

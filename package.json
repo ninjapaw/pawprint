@@ -22,7 +22,8 @@
     "scenario:check": "node scripts/validate-scenario.mjs samples/*.scenario.json",
     "test:guardrails": "node scripts/test-guardrails.mjs",
     "test:policy": "node scripts/test-scenario-policy.mjs",
-    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy"
+    "test:deploy-config": "node scripts/test-deploy-config.mjs",
+    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

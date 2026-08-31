@@ -43,6 +43,11 @@ jobs:
       - name: Assert scenario safety policies reject unsafe manifests
         run: npm run test:policy
 
+      # This resolver is vendored into other repositories, so a regression here
+      # breaks them and none of them can catch it.
+      - name: Test the shared deployment config resolver
+        run: npm run test:deploy-config
+
   shell:
     name: Shell syntax
     runs-on: ubuntu-latest
@@ -71,7 +76,7 @@ jobs:
       - name: Compile every Bicep module
         run: |
           shopt -s nullglob globstar
-          files=(modules/**/*.bicep)
+          files=(modules/**/*.bicep platform/**/*.bicep)
           if [ ${#files[@]} -eq 0 ]; then
             echo "No Bicep modules to compile."
             exit 0
@@ -80,6 +85,13 @@ jobs:
           failed=0
           for file in "${files[@]}"; do
             echo "compiling $file"
-            az bicep build --file "$file" --outfile /dev/null || failed=1
+            log="$(mktemp)"
+            az bicep build --file "$file" --outfile /dev/null 2> "$log" || failed=1
+            # This repository publishes the ruleset, so a warning here would ship
+            # to every consumer as a warning they cannot fix.
+            if grep -E ': (Warning|Error) ' "$log"; then
+              echo "::error file=$file::Bicep linter reported findings."
+              failed=1
+            fi
           done
           exit $failed

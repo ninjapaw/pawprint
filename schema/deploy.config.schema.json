@@ -26,13 +26,23 @@
         "organization": { "type": "string" },
         "license": { "type": "string" },
         "copyright": { "type": "string" },
-        "repository": { "type": "string", "format": "uri" },
+        "repository": { "$ref": "#/$defs/repositoryReference" },
         "support": { "type": "string", "format": "uri" },
         "disclaimer": { "type": "string" }
       }
     },
 
     "defaults": { "$ref": "#/$defs/settings" },
+
+    "scenarios": {
+      "description": "Scenario catalogue for repositories that publish one. Keys are scenario ids; the values carry the human-facing metadata a report renders. The scenario's own manifest, not this, is the authority on what it deploys.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+      "additionalProperties": {
+        "type": "object",
+        "$ref": "#/$defs/noSecretKeys"
+      }
+    },
 
     "environments": {
       "description": "Per-environment overrides layered on top of defaults. Keys are environment names; 'dev' and 'prod' are conventional.",
@@ -44,6 +54,15 @@
   },
 
   "$defs": {
+    "repositoryReference": {
+      "description": "Either a full URL or the owner/repo shorthand. Both are unambiguous and both are already in use across the organisation.",
+      "type": "string",
+      "anyOf": [
+        { "format": "uri" },
+        { "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" }
+      ]
+    },
+
     "noSecretKeys": {
       "description": "Configuration files are committed to source control. Secret-shaped keys are rejected outright; runtime secrets belong in Key Vault, pipeline identity in GitHub Environment variables. JSON Schema uses ECMA-262 regex with no inline case-insensitive flag, so this pattern covers the conventional camelCase and snake_case spellings. Keys that merely name, count or toggle a secret are metadata and are exempt. The resolver additionally applies a case-insensitive check and produces the actionable error message.",
       "propertyNames": {
