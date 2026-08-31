@@ -69,13 +69,20 @@ const settings = {
 validate(config, environmentName, settings, values["require-subscription"]);
 
 const resolver = config.defaults?.resolver ?? {};
+// Values a caller may supply at runtime, for deployment targets whose public
+// URL is not knowable from configuration alone. Empty is not an override.
+const overridable = new Set(resolver.envOverridable ?? []);
 const output = {};
 for (const [name, key] of Object.entries({
   ...BASE_ENV,
   ...(resolver.env ?? {}),
 })) {
   const value = key === "__environmentName" ? environmentName : settings[key];
-  output[name] = value === undefined || value === null ? "" : String(value);
+  const resolved = value === undefined || value === null ? "" : String(value);
+  const override = overridable.has(name)
+    ? (process.env[name] ?? "").trim()
+    : "";
+  output[name] = override === "" ? resolved : override;
 }
 
 const lines = Object.entries(output).map(([name, value]) => `${name}=${value}`);

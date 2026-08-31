@@ -394,6 +394,88 @@ accepts("accepts a platform secrets tier that names its secrets", [
   ),
 ]);
 
+// Deployment targets whose public URL is not knowable from configuration, such
+// as GitHub Pages, supply it at runtime instead.
+accepts(
+  "lets the environment override a variable declared overridable",
+  [
+    "--environment",
+    "dev",
+    "--config",
+    writeConfig(
+      "overridable.json",
+      baseConfig({
+        defaults: {
+          resolver: {
+            required: ["staticWebAppName", "publicSiteUrl"],
+            envOverridable: ["PUBLIC_SITE_URL", "PUBLIC_SITE_BASE"],
+            env: {
+              PUBLIC_SITE_URL: "publicSiteUrl",
+              PUBLIC_SITE_BASE: "siteBase",
+            },
+          },
+        },
+      }),
+    ),
+  ],
+  {
+    PUBLIC_SITE_URL: "https://example.github.io/thing",
+    PUBLIC_SITE_BASE: "/thing/",
+  },
+  (stdout) => {
+    const wanted = [
+      "PUBLIC_SITE_URL=https://example.github.io/thing",
+      "PUBLIC_SITE_BASE=/thing/",
+    ];
+    const missing = wanted.filter((line) => !stdout.includes(line));
+    return missing.length ? `missing ${missing.join(", ")}` : null;
+  },
+);
+
+// A blank variable is not an override; configuration still wins.
+accepts(
+  "ignores a blank override and keeps the configured value",
+  [
+    "--environment",
+    "dev",
+    "--config",
+    writeConfig(
+      "overridable-blank.json",
+      baseConfig({
+        defaults: {
+          resolver: {
+            required: ["staticWebAppName", "publicSiteUrl"],
+            envOverridable: ["PUBLIC_SITE_URL"],
+            env: { PUBLIC_SITE_URL: "publicSiteUrl" },
+          },
+        },
+      }),
+    ),
+  ],
+  { PUBLIC_SITE_URL: "   " },
+  (stdout) =>
+    stdout.includes("PUBLIC_SITE_URL=https://dev.example.com")
+      ? null
+      : "expected the configured publicSiteUrl to win",
+);
+
+// Anything not declared overridable must ignore the environment, otherwise
+// every emitted name becomes an accidental injection point.
+accepts(
+  "ignores the environment for a variable not declared overridable",
+  [
+    "--environment",
+    "dev",
+    "--config",
+    writeConfig("not-overridable.json", baseConfig()),
+  ],
+  { AZURE_STATIC_WEB_APP_NAME: "hijacked" },
+  (stdout) =>
+    stdout.includes("AZURE_STATIC_WEB_APP_NAME=np-example-dev-centralus")
+      ? null
+      : "expected the configured staticWebAppName to win",
+);
+
 if (failures > 0) {
   process.stderr.write(`\n${failures} deploy config test(s) failed.\n`);
   process.exit(1);
