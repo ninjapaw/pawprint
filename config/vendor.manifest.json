@@ -1,0 +1,34 @@
+{
+  "$comment": "Files consumers may vendor under vendor/pawprint/. Bicep has no module registry available here, so sharing means copying; this manifest is what makes the copy auditable rather than folklore. kit-bicep-validate.yml fails a consumer build when a vendored copy drifts from these sources.",
+  "manifestVersion": "1.0.0",
+  "files": [
+    {
+      "path": "scripts/deploy-config.mjs",
+      "description": "Resolves config/deploy.config.json into deployment environment variables."
+    },
+    {
+      "path": "scripts/validate-environment.sh",
+      "description": "Fails on malformed deployment variables before any Azure call is made."
+    },
+    {
+      "path": "scripts/audit-secrets.sh",
+      "description": "Reports expired, expiring and unexpiring Key Vault secrets."
+    },
+    {
+      "path": "modules/static-site/main.bicep",
+      "description": "Static Web App with an optional DNS-validated custom domain."
+    },
+    {
+      "path": "modules/key-vault/main.bicep",
+      "description": "RBAC-authorised Key Vault serving either secret tier."
+    },
+    {
+      "path": "modules/key-vault/secret-access.bicep",
+      "description": "Per-secret read grants, for consumers on the platform secret tier."
+    },
+    {
+      "path": "modules/naming/main.bicep",
+      "description": "The resource naming convention."
+    }
+  ]
+}

@@ -48,6 +48,9 @@ jobs:
       - name: Test the shared deployment config resolver
         run: npm run test:deploy-config
 
+      - name: Assert every vendorable file still exists
+        run: npm run vendor:check
+
   shell:
     name: Shell syntax
     runs-on: ubuntu-latest

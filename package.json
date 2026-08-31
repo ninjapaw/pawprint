@@ -23,7 +23,9 @@
     "test:guardrails": "node scripts/test-guardrails.mjs",
     "test:policy": "node scripts/test-scenario-policy.mjs",
     "test:deploy-config": "node scripts/test-deploy-config.mjs",
-    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config"
+    "vendor:sync": "node scripts/vendor-sync.mjs",
+    "vendor:check": "node scripts/vendor-sync.mjs --verify-sources",
+    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config && npm run vendor:check"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

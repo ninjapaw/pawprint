@@ -21,7 +21,11 @@ function run(args, env = {}) {
     encoding: "utf8",
     env: { ...process.env, AZURE_SUBSCRIPTION_ID: "", ...env },
   });
-  return { code: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+  return {
+    code: result.status,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+  };
 }
 
 function writeConfig(name, contents) {
@@ -73,57 +77,115 @@ function baseConfig(overrides = {}) {
 const rejects = [
   {
     name: "rejects a subscription id committed to config",
-    args: () => ["--environment", "dev", "--config", writeConfig("sub.json", baseConfig({
-      dev: { subscriptionId: "16037566-d4df-4c7c-b484-346d8472b4c4" },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "sub.json",
+        baseConfig({
+          dev: { subscriptionId: "16037566-d4df-4c7c-b484-346d8472b4c4" },
+        }),
+      ),
+    ],
     expect: /must stay empty/i,
   },
   {
     name: "rejects a secret-shaped value in committed config",
-    args: () => ["--environment", "dev", "--config", writeConfig("secret.json", baseConfig({
-      defaults: { clientSecret: "oops" },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "secret.json",
+        baseConfig({
+          defaults: { clientSecret: "oops" },
+        }),
+      ),
+    ],
     expect: /looks like a secret/i,
   },
   {
     name: "rejects a branch that does not own the environment",
-    args: () => ["--environment", "prod", "--config", writeConfig("branch.json", baseConfig({
-      prod: { branch: "dev" },
-    }))],
+    args: () => [
+      "--environment",
+      "prod",
+      "--config",
+      writeConfig(
+        "branch.json",
+        baseConfig({
+          prod: { branch: "dev" },
+        }),
+      ),
+    ],
     expect: /promotion model binds it to 'main'/i,
   },
   {
     name: "rejects a public site url that contradicts the custom domain",
-    args: () => ["--environment", "dev", "--config", writeConfig("url.json", baseConfig({
-      dev: { publicSiteUrl: "https://wrong.example.com" },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "url.json",
+        baseConfig({
+          dev: { publicSiteUrl: "https://wrong.example.com" },
+        }),
+      ),
+    ],
     expect: /must be https:\/\/dev\.example\.com/i,
   },
   {
     name: "rejects an unsupported config version",
-    args: () => ["--environment", "dev", "--config", writeConfig("version.json", {
-      ...baseConfig(),
-      configVersion: "2.0.0",
-    })],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig("version.json", {
+        ...baseConfig(),
+        configVersion: "2.0.0",
+      }),
+    ],
     expect: /Unsupported deployment config version/i,
   },
   {
     name: "rejects a missing repository-declared required setting",
-    args: () => ["--environment", "dev", "--config", writeConfig("required.json", baseConfig({
-      dev: { staticWebAppName: "" },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "required.json",
+        baseConfig({
+          dev: { staticWebAppName: "" },
+        }),
+      ),
+    ],
     expect: /staticWebAppName must be a non-empty string/i,
   },
   {
     name: "rejects an invalid resource group name",
-    args: () => ["--environment", "dev", "--config", writeConfig("rg.json", baseConfig({
-      dev: { resourceGroup: "has spaces and $ymbols" },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "rg.json",
+        baseConfig({
+          dev: { resourceGroup: "has spaces and $ymbols" },
+        }),
+      ),
+    ],
     expect: /not a valid resource group name/i,
   },
   {
     name: "rejects an unknown environment",
-    args: () => ["--environment", "staging", "--config", writeConfig("env.json", baseConfig())],
+    args: () => [
+      "--environment",
+      "staging",
+      "--config",
+      writeConfig("env.json", baseConfig()),
+    ],
     expect: /is not defined/i,
   },
   {
@@ -133,34 +195,75 @@ const rejects = [
   },
   {
     name: "requires a subscription when the deployment asks for one",
-    args: () => ["--environment", "dev", "--require-subscription", "--config", writeConfig("reqsub.json", baseConfig())],
+    args: () => [
+      "--environment",
+      "dev",
+      "--require-subscription",
+      "--config",
+      writeConfig("reqsub.json", baseConfig()),
+    ],
     expect: /Set AZURE_SUBSCRIPTION_ID/i,
   },
   {
     name: "rejects a malformed subscription id from the environment",
-    args: () => ["--environment", "dev", "--config", writeConfig("badsub.json", baseConfig())],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig("badsub.json", baseConfig()),
+    ],
     env: { AZURE_SUBSCRIPTION_ID: "not-a-uuid" },
     expect: /not a UUID/i,
   },
   {
     name: "rejects an unknown secrets mode",
-    args: () => ["--environment", "dev", "--config", writeConfig("mode.json", baseConfig({
-      dev: { secrets: { mode: "shared" } },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "mode.json",
+        baseConfig({
+          dev: { secrets: { mode: "shared" } },
+        }),
+      ),
+    ],
     expect: /must be none, platform or workload/i,
   },
   {
     name: "rejects workload secrets without a vault name",
-    args: () => ["--environment", "dev", "--config", writeConfig("vault.json", baseConfig({
-      dev: { secrets: { mode: "workload" } },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "vault.json",
+        baseConfig({
+          dev: { secrets: { mode: "workload" } },
+        }),
+      ),
+    ],
     expect: /vaultName is required/i,
   },
   {
     name: "rejects platform secrets that name no secrets, which would mean a vault-wide grant",
-    args: () => ["--environment", "dev", "--config", writeConfig("platform.json", baseConfig({
-      dev: { secrets: { mode: "platform", platformVaultName: "np-platform-dev-kv", secretNames: [] } },
-    }))],
+    args: () => [
+      "--environment",
+      "dev",
+      "--config",
+      writeConfig(
+        "platform.json",
+        baseConfig({
+          dev: {
+            secrets: {
+              mode: "platform",
+              platformVaultName: "np-platform-dev-kv",
+              secretNames: [],
+            },
+          },
+        }),
+      ),
+    ],
     expect: /must name at least one secret/i,
   },
 ];
@@ -173,7 +276,9 @@ for (const testCase of rejects) {
 
   if (code === 0) {
     failures += 1;
-    process.stderr.write(`FAIL  ${testCase.name}\n      expected a non-zero exit, got 0\n`);
+    process.stderr.write(
+      `FAIL  ${testCase.name}\n      expected a non-zero exit, got 0\n`,
+    );
     continue;
   }
   if (!testCase.expect.test(output)) {
@@ -191,13 +296,17 @@ function accepts(name, args, env, assertion) {
   const result = run(args, env);
   if (result.code !== 0) {
     failures += 1;
-    process.stderr.write(`FAIL  ${name}\n      exit ${result.code}: ${result.stderr.trim()}\n`);
+    process.stderr.write(
+      `FAIL  ${name}\n      exit ${result.code}: ${result.stderr.trim()}\n`,
+    );
     return;
   }
   const problem = assertion ? assertion(result.stdout) : null;
   if (problem) {
     failures += 1;
-    process.stderr.write(`FAIL  ${name}\n      ${problem}\n      got: ${result.stdout.trim()}\n`);
+    process.stderr.write(
+      `FAIL  ${name}\n      ${problem}\n      got: ${result.stdout.trim()}\n`,
+    );
     return;
   }
   process.stdout.write(`ok    ${name}\n`);
@@ -228,7 +337,10 @@ accepts(
   "resolves prod from the main branch",
   ["--branch", "main", "--config", healthy],
   {},
-  (stdout) => (stdout.includes("DEPLOY_ENVIRONMENT=prod") ? null : "expected DEPLOY_ENVIRONMENT=prod"),
+  (stdout) =>
+    stdout.includes("DEPLOY_ENVIRONMENT=prod")
+      ? null
+      : "expected DEPLOY_ENVIRONMENT=prod",
 );
 
 accepts(
@@ -236,20 +348,22 @@ accepts(
   ["--environment", "dev", "--require-subscription", "--config", healthy],
   { AZURE_SUBSCRIPTION_ID: "16037566-d4df-4c7c-b484-346d8472b4c4" },
   (stdout) =>
-    stdout.includes("AZURE_SUBSCRIPTION_ID=16037566-d4df-4c7c-b484-346d8472b4c4")
+    stdout.includes(
+      "AZURE_SUBSCRIPTION_ID=16037566-d4df-4c7c-b484-346d8472b4c4",
+    )
       ? null
       : "expected the runtime subscription id to be emitted",
 );
 
 // Keys that name, count or toggle a secret are metadata, not secrets. Refusing
 // them would make the guardrail unusable for any repository that has a vault.
-accepts(
-  "accepts secret metadata keys that hold no secret",
-  [
-    "--environment",
-    "dev",
-    "--config",
-    writeConfig("metadata.json", baseConfig({
+accepts("accepts secret metadata keys that hold no secret", [
+  "--environment",
+  "dev",
+  "--config",
+  writeConfig(
+    "metadata.json",
+    baseConfig({
       defaults: {
         aiApiKeySecretName: "ai-api-key",
         secretExpirationDays: 365,
@@ -258,17 +372,17 @@ accepts(
       dev: {
         secrets: { mode: "workload", vaultName: "np-example-dev-kv" },
       },
-    })),
-  ],
-);
+    }),
+  ),
+]);
 
-accepts(
-  "accepts a platform secrets tier that names its secrets",
-  [
-    "--environment",
-    "dev",
-    "--config",
-    writeConfig("platform-ok.json", baseConfig({
+accepts("accepts a platform secrets tier that names its secrets", [
+  "--environment",
+  "dev",
+  "--config",
+  writeConfig(
+    "platform-ok.json",
+    baseConfig({
       dev: {
         secrets: {
           mode: "platform",
@@ -276,9 +390,9 @@ accepts(
           secretNames: ["ai-api-key"],
         },
       },
-    })),
-  ],
-);
+    }),
+  ),
+]);
 
 if (failures > 0) {
   process.stderr.write(`\n${failures} deploy config test(s) failed.\n`);

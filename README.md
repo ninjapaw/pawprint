@@ -219,7 +219,19 @@ Bicep has no module registry here, so shared modules and scripts are vendored
 into consumers under `vendor/pawprint/` with paths mirroring this repository.
 `kit-bicep-validate.yml` fails the build when a vendored copy drifts, which is
 what keeps a copy from quietly becoming a fork. Re-vendor rather than editing
-the copy.
+the copy:
+
+```bash
+# What is vendorable is declared in config/vendor.manifest.json.
+node scripts/vendor-sync.mjs --target ../site --target ../m365profiles
+node scripts/vendor-sync.mjs --target ../site --check
+node scripts/vendor-sync.mjs --target ../site --add modules/naming/main.bicep
+```
+
+Only files already present in the consumer are synchronised, so a repository
+takes on a shared file deliberately with `--add` rather than by accident. Run
+the sync after changing anything under the manifest; a formatter reformatting a
+shared file counts as changing it.
 
 ```yaml
 jobs:
