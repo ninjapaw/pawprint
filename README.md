@@ -19,14 +19,14 @@ record of what was deployed, asserted, and observed.
 
 ## What is included
 
-| Path | Purpose |
-| --- | --- |
-| `schema/` | Pawprint, scenario, connector, and deployment-config contracts |
-| `platform/` | Subscription-scope run resource group, tags, and expiry metadata |
-| `modules/` | Reusable Bicep modules |
-| `scripts/` | Configuration, setup, validation, connector, doctor, and uninstall tooling |
-| `.github/workflows/kit-*.yml` | Reusable validation, promotion, and cleanup workflows |
-| `samples/` | Reference scenario and pawprint fixtures |
+| Path                          | Purpose                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| `schema/`                     | Pawprint, scenario, connector, and deployment-config contracts             |
+| `platform/`                   | Subscription-scope run resource group, tags, and expiry metadata           |
+| `modules/`                    | Reusable Bicep modules                                                     |
+| `scripts/`                    | Configuration, setup, validation, connector, doctor, and uninstall tooling |
+| `.github/workflows/kit-*.yml` | Reusable validation, Defender posture, promotion, and cleanup workflows    |
+| `samples/`                    | Reference scenario and pawprint fixtures                                   |
 
 ## Quick start
 
@@ -79,21 +79,21 @@ Environment variables, not repository files or long-lived client secrets.
 
 Pawprint has three separate planes:
 
-| Plane | Default posture |
-| --- | --- |
-| Viewer | Static/client-side and unauthenticated; stores nothing |
+| Plane                     | Default posture                                                     |
+| ------------------------- | ------------------------------------------------------------------- |
+| Viewer                    | Static/client-side and unauthenticated; stores nothing              |
 | Local setup/admin console | Loopback-only, using workforce Entra or a local fallback credential |
-| Hosted team console | Internal deployment protected by workforce Entra app roles |
+| Hosted team console       | Internal deployment protected by workforce Entra app roles          |
 
 Use the existing workforce Entra tenant so Conditional Access, MFA, Identity
 Protection, PIM, audit retention, and group-based access remain in one place.
 Assign app roles to groups where possible:
 
-| Role | Responsibility |
-| --- | --- |
-| `Pawprint.Admin` | Configure identity, sinks, environments, and destructive operations |
-| `Pawprint.Operator` | Deploy, remediate, verify, and destroy runs |
-| `Pawprint.Reader` | View pawprints and configuration |
+| Role                | Responsibility                                                      |
+| ------------------- | ------------------------------------------------------------------- |
+| `Pawprint.Admin`    | Configure identity, sinks, environments, and destructive operations |
+| `Pawprint.Operator` | Deploy, remediate, verify, and destroy runs                         |
+| `Pawprint.Reader`   | View pawprints and configuration                                    |
 
 GitHub repository actions are separate from human sign-in. Prefer a GitHub App
 for repository automation. If using reusable workflows, pin an immutable
@@ -107,11 +107,11 @@ uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
 
 Pawprints are JSON and remain portable regardless of where they are stored.
 
-| Sink | Use |
-| --- | --- |
-| `file` | Local, offline, or air-gapped runs |
-| `githubArtifact` | Convenient CI retention; not a system of record |
-| `azureBlob` | Durable evidence storage; enable immutability for relied-on evidence |
+| Sink             | Use                                                                  |
+| ---------------- | -------------------------------------------------------------------- |
+| `file`           | Local, offline, or air-gapped runs                                   |
+| `githubArtifact` | Convenient CI retention; not a system of record                      |
+| `azureBlob`      | Durable evidence storage; enable immutability for relied-on evidence |
 
 Use `azureBlob` with `immutable: true` when evidence must be tamper-resistant.
 The configured retention policy prevents alteration or deletion before expiry.
@@ -157,11 +157,11 @@ preferred because they are type-checked.
 Connectors are optional and permission-tiered. Start with the lowest tier that
 unlocks the capability you need:
 
-| Tier | Meaning |
-| --- | --- |
-| `none` | Identity only or disconnected |
-| `read` | Observe; no changes |
-| `write` | Act within the intended resource boundary |
+| Tier    | Meaning                                            |
+| ------- | -------------------------------------------------- |
+| `none`  | Identity only or disconnected                      |
+| `read`  | Observe; no changes                                |
+| `write` | Act within the intended resource boundary          |
 | `admin` | Elevated or app-only access; avoid unless required |
 
 ```bash

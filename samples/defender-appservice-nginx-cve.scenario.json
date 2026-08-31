@@ -39,8 +39,16 @@
   },
 
   "controls": [
-    { "framework": "MITRE ATT&CK", "id": "T1190", "title": "Exploit Public-Facing Application" },
-    { "framework": "NIST SP 800-53", "id": "RA-5", "title": "Vulnerability Monitoring and Scanning" },
+    {
+      "framework": "MITRE ATT&CK",
+      "id": "T1190",
+      "title": "Exploit Public-Facing Application"
+    },
+    {
+      "framework": "NIST SP 800-53",
+      "id": "RA-5",
+      "title": "Vulnerability Monitoring and Scanning"
+    },
     { "framework": "NIST SP 800-53", "id": "SI-2", "title": "Flaw Remediation" }
   ],
 
@@ -52,7 +60,16 @@
     "component": "NGINX Open Source"
   },
 
-  "stages": ["provision", "build", "deploy", "arm", "detect", "remediate", "verify", "destroy"],
+  "stages": [
+    "provision",
+    "build",
+    "deploy",
+    "arm",
+    "detect",
+    "remediate",
+    "verify",
+    "destroy"
+  ],
 
   "parameters": {
     "nginxVersion": {
@@ -123,10 +140,13 @@
       "cspmExtensions": {
         "AgentlessServerlessPosture": true,
         "ServerlessContainers": true,
-        "ContainerRegistriesVulnerabilityAssessments": true
+        "ContainerRegistriesVulnerabilityAssessments": true,
+        "AgentlessVmScanning": true,
+        "ApiPosture": true
       },
       "containersExtensions": {
-        "ContainerRegistriesVulnerabilityAssessments": true
+        "ContainerRegistriesVulnerabilityAssessments": true,
+        "AgentlessVmScanning": true
       }
     }
   },
@@ -256,9 +276,24 @@
   ],
 
   "endpoints": [
-    { "name": "dashboard", "path": "/", "public": true, "description": "Static status dashboard." },
-    { "name": "health", "path": "/health", "public": true, "description": "Liveness probe." },
-    { "name": "status", "path": "/api/status", "public": true, "description": "Runtime CVE evidence as JSON." }
+    {
+      "name": "dashboard",
+      "path": "/",
+      "public": true,
+      "description": "Static status dashboard."
+    },
+    {
+      "name": "health",
+      "path": "/health",
+      "public": true,
+      "description": "Liveness probe."
+    },
+    {
+      "name": "status",
+      "path": "/api/status",
+      "public": true,
+      "description": "Runtime CVE evidence as JSON."
+    }
   ],
 
   "documentation": {

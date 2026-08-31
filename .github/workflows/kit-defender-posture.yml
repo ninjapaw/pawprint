@@ -1,0 +1,285 @@
+name: Kit / Defender posture
+
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-defender-posture.yml@<immutable-ref>
+#
+# Audits subscription-scoped Defender for Cloud pricing plans, plan extensions,
+# the Defender for Cloud GitHub connector, and GitHub Advanced Security state.
+# Plan and extension writes are idempotent: when Azure already reports the
+# requested state, this kit records the audit evidence and skips the write.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment supplying Azure OIDC variables.
+        type: string
+        required: true
+      resource-group:
+        description: Resource group used when a Defender GitHub connector must be created.
+        type: string
+        required: true
+      location:
+        type: string
+        default: centralus
+      apply:
+        description: Apply missing Defender plans/extensions and create a connector shell when absent.
+        type: boolean
+        default: false
+      defender-appservices-tier:
+        type: string
+        default: Standard
+      defender-containers-tier:
+        type: string
+        default: Standard
+      defender-cspm-tier:
+        type: string
+        default: Standard
+      defender-arm-tier:
+        type: string
+        default: Standard
+      defender-cspm-agentless-serverless-posture:
+        type: string
+        default: "true"
+      defender-cspm-serverless-containers:
+        type: string
+        default: "true"
+      defender-cspm-registry-assessment:
+        type: string
+        default: "true"
+      defender-cspm-kubernetes-discovery:
+        type: string
+        default: "false"
+      defender-cspm-vm-scanning:
+        type: string
+        default: "true"
+      defender-cspm-sensitive-data:
+        type: string
+        default: "false"
+      defender-cspm-permissions-management:
+        type: string
+        default: "false"
+      defender-cspm-api-posture:
+        type: string
+        default: "true"
+      defender-containers-registry-assessment:
+        type: string
+        default: "true"
+      defender-containers-kubernetes-discovery:
+        type: string
+        default: "false"
+      defender-containers-vm-scanning:
+        type: string
+        default: "true"
+      defender-containers-sensor:
+        type: string
+        default: "false"
+      defender-devops-connector-enabled:
+        type: string
+        default: "true"
+      defender-devops-connector-name:
+        type: string
+        default: pawprint-github
+      defender-devops-github-owner:
+        type: string
+        default: ""
+      github-advanced-security-expected:
+        type: string
+        default: "true"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  posture:
+    name: Defender posture audit
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      APPLY: ${{ inputs.apply }}
+      RESOURCE_GROUP: ${{ inputs.resource-group }}
+      LOCATION: ${{ inputs.location }}
+      DEFENDER_APPSERVICES_TIER: ${{ inputs.defender-appservices-tier }}
+      DEFENDER_CONTAINERS_TIER: ${{ inputs.defender-containers-tier }}
+      DEFENDER_CSPM_TIER: ${{ inputs.defender-cspm-tier }}
+      DEFENDER_ARM_TIER: ${{ inputs.defender-arm-tier }}
+      DEFENDER_CSPM_AGENTLESS_SERVERLESS_POSTURE: ${{ inputs.defender-cspm-agentless-serverless-posture }}
+      DEFENDER_CSPM_SERVERLESS_CONTAINERS: ${{ inputs.defender-cspm-serverless-containers }}
+      DEFENDER_CSPM_REGISTRY_ASSESSMENT: ${{ inputs.defender-cspm-registry-assessment }}
+      DEFENDER_CSPM_KUBERNETES_DISCOVERY: ${{ inputs.defender-cspm-kubernetes-discovery }}
+      DEFENDER_CSPM_VM_SCANNING: ${{ inputs.defender-cspm-vm-scanning }}
+      DEFENDER_CSPM_SENSITIVE_DATA: ${{ inputs.defender-cspm-sensitive-data }}
+      DEFENDER_CSPM_PERMISSIONS_MANAGEMENT: ${{ inputs.defender-cspm-permissions-management }}
+      DEFENDER_CSPM_API_POSTURE: ${{ inputs.defender-cspm-api-posture }}
+      DEFENDER_CONTAINERS_REGISTRY_ASSESSMENT: ${{ inputs.defender-containers-registry-assessment }}
+      DEFENDER_CONTAINERS_KUBERNETES_DISCOVERY: ${{ inputs.defender-containers-kubernetes-discovery }}
+      DEFENDER_CONTAINERS_VM_SCANNING: ${{ inputs.defender-containers-vm-scanning }}
+      DEFENDER_CONTAINERS_SENSOR: ${{ inputs.defender-containers-sensor }}
+      DEFENDER_DEVOPS_CONNECTOR_ENABLED: ${{ inputs.defender-devops-connector-enabled }}
+      DEFENDER_DEVOPS_CONNECTOR_NAME: ${{ inputs.defender-devops-connector-name }}
+      DEFENDER_DEVOPS_GITHUB_OWNER: ${{ inputs.defender-devops-github-owner || github.repository_owner }}
+      GITHUB_ADVANCED_SECURITY_EXPECTED: ${{ inputs.github-advanced-security-expected }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Authenticate to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Audit and optionally enable Defender posture
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary="defender-posture-summary.md"
+          failures=0
+          : > "$summary"
+
+          truthy() {
+            case "${1,,}" in true|1|yes|on) return 0 ;; *) return 1 ;; esac
+          }
+
+          normalize_state() {
+            case "$1" in True|true) printf 'true' ;; False|false) printf 'false' ;; *) printf 'unknown' ;; esac
+          }
+
+          plan_tier() {
+            az security pricing show --name "$1" --query pricingTier -o tsv 2>/dev/null || true
+          }
+
+          extension_state() {
+            local value
+            value="$(az security pricing show --name "$1" --query "extensions[?name=='$2'].isEnabled | [0]" -o tsv 2>/dev/null || true)"
+            normalize_state "$value"
+          }
+
+          add_row() {
+            printf '| %s | %s | %s |\n' "$1" "$2" "$3" >> "$summary"
+          }
+
+          ensure_plan() {
+            local plan="$1" desired="$2" label="$3" current
+            if [[ "$desired" == disabled || "$desired" == off ]]; then
+              add_row "$label" 'Skipped' 'Disabled by configuration.'
+              return
+            fi
+            current="$(plan_tier "$plan")"
+            if [[ "$current" == "$desired" ]]; then
+              add_row "$label" 'Pass' "Already $desired; enablement skipped and state audited."
+              return
+            fi
+            if truthy "$APPLY"; then
+              az security pricing create --name "$plan" --tier "$desired" --output none
+              current="$(plan_tier "$plan")"
+            fi
+            if [[ "$current" == "$desired" ]]; then
+              add_row "$label" 'Pass' "Azure reports $desired."
+            else
+              add_row "$label" 'Fail' "Azure reports ${current:-unknown}; expected $desired."
+              failures=$((failures + 1))
+            fi
+          }
+
+          ensure_extensions() {
+            local plan="$1" tier="$2" label="$3" spec="$4"
+            local extension desired current drift=0 args=()
+            [[ "$tier" == Standard ]] || { add_row "$label extensions" 'Skipped' 'Plan is not Standard.'; return; }
+            while IFS='=' read -r extension desired; do
+              [[ -n "$extension" ]] || continue
+              current="$(extension_state "$plan" "$extension")"
+              [[ "$current" == "$desired" ]] || drift=1
+              if [[ "$desired" == true ]]; then
+                args+=(--extensions "name=$extension" isEnabled=True)
+              else
+                args+=(--extensions "name=$extension" isEnabled=False)
+              fi
+            done <<< "$spec"
+            if ((drift == 1)) && truthy "$APPLY"; then
+              az security pricing create --name "$plan" --tier "$tier" "${args[@]}" --output none
+            fi
+            while IFS='=' read -r extension desired; do
+              [[ -n "$extension" ]] || continue
+              current="$(extension_state "$plan" "$extension")"
+              if [[ "$current" == "$desired" ]]; then
+                if [[ "$desired" == true ]]; then
+                  add_row "$label: $extension" 'Pass' 'Enabled and audited; update skipped when already current.'
+                else
+                  add_row "$label: $extension" 'Skipped' 'Disabled by configuration and audited.'
+                fi
+              else
+                add_row "$label: $extension" 'Fail' "Azure reports $current; expected $desired."
+                failures=$((failures + 1))
+              fi
+            done <<< "$spec"
+          }
+
+          echo '### Defender posture audit' >> "$summary"
+          echo '' >> "$summary"
+          echo '| Check | Result | Evidence |' >> "$summary"
+          echo '| --- | --- | --- |' >> "$summary"
+
+          ensure_plan AppServices "$DEFENDER_APPSERVICES_TIER" 'Defender for App Service'
+          ensure_plan Containers "$DEFENDER_CONTAINERS_TIER" 'Defender for Containers'
+          ensure_plan CloudPosture "$DEFENDER_CSPM_TIER" 'Defender CSPM'
+          ensure_plan Arm "$DEFENDER_ARM_TIER" 'Defender for Resource Manager'
+
+          cspm_spec="$(cat <<EOF
+          AgentlessServerlessPosture=$DEFENDER_CSPM_AGENTLESS_SERVERLESS_POSTURE
+          ServerlessContainers=$DEFENDER_CSPM_SERVERLESS_CONTAINERS
+          ContainerRegistriesVulnerabilityAssessments=$DEFENDER_CSPM_REGISTRY_ASSESSMENT
+          AgentlessDiscoveryForKubernetes=$DEFENDER_CSPM_KUBERNETES_DISCOVERY
+          AgentlessVmScanning=$DEFENDER_CSPM_VM_SCANNING
+          SensitiveDataDiscovery=$DEFENDER_CSPM_SENSITIVE_DATA
+          EntraPermissionsManagement=$DEFENDER_CSPM_PERMISSIONS_MANAGEMENT
+          ApiPosture=$DEFENDER_CSPM_API_POSTURE
+          EOF
+          )"
+          containers_spec="$(cat <<EOF
+          ContainerRegistriesVulnerabilityAssessments=$DEFENDER_CONTAINERS_REGISTRY_ASSESSMENT
+          AgentlessDiscoveryForKubernetes=$DEFENDER_CONTAINERS_KUBERNETES_DISCOVERY
+          AgentlessVmScanning=$DEFENDER_CONTAINERS_VM_SCANNING
+          ContainerSensor=$DEFENDER_CONTAINERS_SENSOR
+          EOF
+          )"
+
+          ensure_extensions CloudPosture "$DEFENDER_CSPM_TIER" 'Defender CSPM' "$cspm_spec"
+          ensure_extensions Containers "$DEFENDER_CONTAINERS_TIER" 'Defender for Containers' "$containers_spec"
+
+          if truthy "$DEFENDER_DEVOPS_CONNECTOR_ENABLED"; then
+            connector="$(az security security-connector list --query "[?environmentName=='Github' || environmentName=='GitHub'].name | [0]" -o tsv 2>/dev/null || true)"
+            if [[ -n "$connector" ]]; then
+              add_row 'Defender for Cloud GitHub connector' 'Pass' "Connector '$connector' exists; creation skipped."
+            elif truthy "$APPLY"; then
+              az security security-connector create --name "$DEFENDER_DEVOPS_CONNECTOR_NAME" --resource-group "$RESOURCE_GROUP" --location "$LOCATION" --hierarchy-identifier "$(uuidgen)" --environment-name GitHub --environment-data github-scope='{}' --offerings '[0].cspm-monitor-github={}' --output none
+              add_row 'Defender for Cloud GitHub connector' 'Warning' "Connector shell '$DEFENDER_DEVOPS_CONNECTOR_NAME' was created; GitHub App authorization is still interactive."
+            else
+              add_row 'Defender for Cloud GitHub connector' 'Fail' 'No connector exists and apply=false.'
+              failures=$((failures + 1))
+            fi
+          else
+            add_row 'Defender for Cloud GitHub connector' 'Skipped' 'Disabled by configuration.'
+          fi
+
+          if truthy "$GITHUB_ADVANCED_SECURITY_EXPECTED"; then
+            state="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.security_and_analysis.advanced_security.status // "unknown"' 2>/dev/null || printf 'unknown')"
+            if [[ "$state" == enabled ]]; then
+              add_row 'GitHub Advanced Security' 'Pass' 'GitHub reports Advanced Security enabled.'
+            else
+              add_row 'GitHub Advanced Security' 'Warning' "GitHub reported '$state'; public repositories may still run CodeQL without GHAS licensing."
+            fi
+          else
+            add_row 'GitHub Advanced Security' 'Skipped' 'Not expected by configuration.'
+          fi
+
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          cat "$summary"
+          exit "$failures"
+
+      - name: Upload Defender posture audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: defender-posture-audit-${{ inputs.environment }}
+          path: defender-posture-summary.md
