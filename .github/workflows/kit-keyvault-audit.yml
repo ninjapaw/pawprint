@@ -1,0 +1,84 @@
+name: Kit / Key Vault audit
+
+# Reusable. Consumers pin an immutable ref (release tag or commit SHA):
+#   uses: ninjapaw/pawprint/.github/workflows/kit-keyvault-audit.yml@<immutable-ref>
+#
+# Reports secrets that have expired, are about to expire, or carry no expiry at
+# all. The third case matters most: a secret with no expiration date is one
+# nobody is ever prompted to rotate. Secret values are never read.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment supplying the OIDC identity variables.
+        type: string
+        required: true
+      vault-name:
+        description: Key Vault to audit. Defaults to the AZURE_KEY_VAULT_NAME environment variable resolved from config.
+        type: string
+        default: ""
+      config-file:
+        type: string
+        default: config/deploy.config.json
+      warn-days:
+        description: How far ahead to treat a secret as expiring.
+        type: number
+        default: 30
+      fail-on-expiring:
+        description: Fail the run on an expiring secret, not only an expired one. Use this on a schedule so rotation is forced before an outage.
+        type: boolean
+        default: false
+      audit-script:
+        description: Path to the vendored audit script.
+        type: string
+        default: vendor/pawprint/scripts/audit-secrets.sh
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  audit:
+    name: Audit secret expiry
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve the vault name
+        id: vault
+        env:
+          INPUT_VAULT: ${{ inputs.vault-name }}
+          CONFIG_FILE: ${{ inputs.config-file }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          vault="$INPUT_VAULT"
+          if [ -z "$vault" ] && [ -f "$CONFIG_FILE" ]; then
+            vault="$(jq -r --arg env "$ENVIRONMENT" '.environments[$env].secrets.vaultName // .environments[$env].keyVaultName // empty' "$CONFIG_FILE")"
+          fi
+          if [ -z "$vault" ]; then
+            echo "::error::No Key Vault name supplied and none found in $CONFIG_FILE for environment '$ENVIRONMENT'."
+            exit 1
+          fi
+          echo "name=$vault" >> "$GITHUB_OUTPUT"
+
+      - name: Audit
+        env:
+          AZURE_KEY_VAULT_NAME: ${{ steps.vault.outputs.name }}
+          AZURE_SECRET_WARN_DAYS: ${{ inputs.warn-days }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${{ inputs.fail-on-expiring }}" = "true" ]; then
+            args+=(--fail-on-expiring)
+          fi
+          bash "${{ inputs.audit-script }}" "${args[@]}"

@@ -192,6 +192,77 @@ default. Entra-deleted applications remain restorable for 30 days unless the
 explicit purge option is used. Immutable evidence and subscription-wide
 Defender plan activation may not be immediately reversible.
 
+## Shared platform kit
+
+Pawprint is also where the organisation's shared deployment building blocks
+live, so a change to a convention is made once rather than in every repository.
+
+| Reusable workflow            | Owns                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| `kit-bicep-validate.yml`     | Bicep compilation, the shared linter ruleset, committed-ARM and vendored drift |
+| `kit-deploy-static-site.yml` | Branch-to-environment binding, build, Static Web Apps publish, release         |
+| `kit-promote.yml`            | Dev-to-main promotion pull request, gated on CI                                |
+| `kit-keyvault-audit.yml`     | Secret expiry reporting, including secrets carrying no expiry at all           |
+| `kit-scenario-validate.yml`  | Scenario manifest schema and policy                                            |
+| `kit-reap-expired.yml`       | Teardown of runs past their `pawprint.expiresAt` tag                           |
+
+| Shared module                   | Deploys                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| `modules/static-site`           | Static Web App with optional DNS-validated custom domain      |
+| `modules/key-vault`             | RBAC-authorised vault with audit logging, both secret tiers   |
+| `modules/container-app-service` | Linux container on App Service with managed-identity ACR pull |
+| `modules/evidence-store`        | Write-once blob storage for pawprints                         |
+| `modules/monitoring`            | Log Analytics and Application Insights for an ephemeral run   |
+| `modules/naming`                | The resource naming convention                                |
+
+Bicep has no module registry here, so shared modules and scripts are vendored
+into consumers under `vendor/pawprint/` with paths mirroring this repository.
+`kit-bicep-validate.yml` fails the build when a vendored copy drifts, which is
+what keeps a copy from quietly becoming a fork. Re-vendor rather than editing
+the copy.
+
+```yaml
+jobs:
+  infrastructure:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ninjapaw/pawprint/.github/workflows/kit-bicep-validate.yml@<immutable-ref>
+    with:
+      bicep-glob: "{infra,vendor}/**/*.bicep"
+      check-committed-arm: true
+```
+
+### Secret tiers
+
+`config/deploy.config.json` declares where a service's secrets live. The default
+is `none`, because most services have no secrets and should not provision a
+vault for them. Key Vault costs almost nothing at rest, so consolidation is
+never a cost decision; it is a blast-radius decision.
+
+| Mode       | Vault                                      | When                                                     |
+| ---------- | ------------------------------------------ | -------------------------------------------------------- |
+| `none`     | None                                       | The service has no secrets. Keep it this way.            |
+| `workload` | Owned by the repository, in its own group  | Secrets belong to exactly one service and die with it    |
+| `platform` | Tier 0 vault owned by `platform/org.bicep` | More than one repository genuinely needs the same secret |
+
+In `platform` mode the service is granted `Key Vault Secrets User` scoped to the
+individual secrets it names, never to the vault. That per-secret scoping is what
+makes a shared vault safe to share; without it, one compromised workload
+identity reaches every secret in the tier.
+
+The platform baseline is deliberately small and off by default:
+
+```bash
+az deployment sub create \
+  --location centralus \
+  --template-file platform/org.bicep \
+  --parameters platform/org.dev.bicepparam
+```
+
+Dev and production live in separate subscriptions, so there is one platform
+resource group per environment rather than one for the organisation.
+
 ## CI and adoption
 
 Run the local checks before opening a pull request:

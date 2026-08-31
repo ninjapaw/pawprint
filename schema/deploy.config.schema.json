@@ -45,11 +45,21 @@
 
   "$defs": {
     "noSecretKeys": {
-      "description": "Configuration files are committed to source control. Secret-shaped keys are rejected outright; runtime secrets belong in Key Vault, pipeline identity in GitHub Environment variables. JSON Schema uses ECMA-262 regex with no inline case-insensitive flag, so this pattern covers the conventional camelCase and snake_case spellings. The resolver additionally applies a case-insensitive check and produces the actionable error message.",
+      "description": "Configuration files are committed to source control. Secret-shaped keys are rejected outright; runtime secrets belong in Key Vault, pipeline identity in GitHub Environment variables. JSON Schema uses ECMA-262 regex with no inline case-insensitive flag, so this pattern covers the conventional camelCase and snake_case spellings. Keys that merely name, count or toggle a secret are metadata and are exempt. The resolver additionally applies a case-insensitive check and produces the actionable error message.",
       "propertyNames": {
-        "not": {
-          "pattern": "([Pp]assword|[Pp]asswd|[Ss]ecret|[Aa]pi[_]?[Kk]ey|[Cc]lient[_]?[Ss]ecret|[Tt]oken|[Cc]redential|[Cc]onnection[_]?[Ss]tring|[Pp]rivate[_]?[Kk]ey|[Pp]fx)"
-        }
+        "anyOf": [
+          {
+            "pattern": "([Nn]ames?|[Dd]ays|[Ee]nabled|[Mm]ode|[Tt]ier|[Pp]ath|[Uu]ri|[Uu]rl|[Cc]ount)$"
+          },
+          {
+            "const": "secrets"
+          },
+          {
+            "not": {
+              "pattern": "([Pp]assword|[Pp]asswd|[Ss]ecret|[Aa]pi[_]?[Kk]ey|[Cc]lient[_]?[Ss]ecret|[Tt]oken|[Cc]redential|[Cc]onnection[_]?[Ss]tring|[Pp]rivate[_]?[Kk]ey|[Pp]fx)"
+            }
+          }
+        ]
       }
     },
 
@@ -68,6 +78,72 @@
       "type": "string",
       "enum": ["none", "read", "write", "admin"],
       "default": "none"
+    },
+
+    "secrets": {
+      "description": "Where this service's runtime secrets live. Default is none: a service with no secrets should not provision a vault, and most do not have any. Key Vault costs almost nothing at rest, so consolidation is never a cost decision; it is a blast-radius decision.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "description": "none: no vault and no grants. workload: this repository deploys and owns a vault in its own resource group, so the vault's lifetime matches the service's. platform: the shared tier 0 vault holds the secrets and this service is granted read access scoped to named secrets only, never to the whole vault.",
+          "type": "string",
+          "enum": ["none", "platform", "workload"],
+          "default": "none"
+        },
+        "vaultName": {
+          "description": "Workload vault name. Azure caps this at 24 characters.",
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]{1,22}[A-Za-z0-9]$"
+        },
+        "platformVaultName": {
+          "description": "Tier 0 vault the named secrets are read from. Owned by pawprint, not by this repository.",
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]{1,22}[A-Za-z0-9]$"
+        },
+        "secretNames": {
+          "description": "Secrets this service reads. Each one becomes an individually scoped role assignment, which is what keeps a shared vault safe to share.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9-]{1,127}$" }
+        },
+        "purgeProtection": {
+          "description": "Azure cannot turn this off once enabled, and it reserves the vault name for the whole soft-delete window. Ephemeral or frequently rebuilt workloads should leave it false.",
+          "type": "boolean",
+          "default": true
+        },
+        "expirationDays": {
+          "description": "Expiry stamped on rotated secrets. A secret with no expiry is a secret nobody ever rotates.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1095,
+          "default": 365
+        },
+        "warningDays": {
+          "description": "How long before expiry the audit starts warning.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "mode": { "const": "workload" } },
+            "required": ["mode"]
+          },
+          "then": { "required": ["vaultName"] }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "platform" } },
+            "required": ["mode"]
+          },
+          "then": { "required": ["platformVaultName", "secretNames"] }
+        }
+      ]
     },
 
     "approvedSubscriptions": {
@@ -144,7 +220,10 @@
           },
           "allOf": [
             {
-              "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+              "if": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              },
               "then": { "required": ["accountName"] }
             }
           ]
@@ -191,7 +270,10 @@
         "appRoles": {
           "description": "Role names expected in the token. Authorization decisions read these claims.",
           "type": "array",
-          "items": { "type": "string", "enum": ["Pawprint.Admin", "Pawprint.Operator", "Pawprint.Reader"] }
+          "items": {
+            "type": "string",
+            "enum": ["Pawprint.Admin", "Pawprint.Operator", "Pawprint.Reader"]
+          }
         },
         "bindAddress": {
           "description": "Interface the local console binds to. Loopback is the default and changing it exposes the console to the network.",
@@ -218,7 +300,10 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "mode": { "const": "entra" } }, "required": ["mode"] },
+          "if": {
+            "properties": { "mode": { "const": "entra" } },
+            "required": ["mode"]
+          },
           "then": { "required": ["tenantId", "clientId"] }
         }
       ]
@@ -268,6 +353,7 @@
         "sinks": { "$ref": "#/$defs/sinks" },
         "admin": { "$ref": "#/$defs/admin" },
         "connectors": { "$ref": "#/$defs/connectors" },
+        "secrets": { "$ref": "#/$defs/secrets" },
         "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }
     },
@@ -307,6 +393,7 @@
         "sinks": { "$ref": "#/$defs/sinks" },
         "admin": { "$ref": "#/$defs/admin" },
         "connectors": { "$ref": "#/$defs/connectors" },
+        "secrets": { "$ref": "#/$defs/secrets" },
         "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }
     }

@@ -107,20 +107,19 @@ jobs:
             title="Promote ${{ inputs.source-branch }} to ${{ inputs.target-branch }}"
           fi
 
-          body=$(cat <<'BODY'
-Automated promotion pull request.
-
-### Promotion checklist
-- [ ] CI passed on the source branch
-- [ ] Infrastructure what-if reviewed for unintended changes
-- [ ] Configuration or variable changes reviewed, including impact tier
-- [ ] Rollback path understood
-
-BODY
-)
-          body="${body}
-Commits ahead: ${{ steps.compare.outputs.ahead }}
-Source head: ${{ steps.compare.outputs.head-sha }}"
+          # Built with printf rather than a heredoc: an unindented heredoc body
+          # terminates the surrounding YAML block scalar and breaks the workflow.
+          body="$(printf '%s\n' \
+            'Automated promotion pull request.' \
+            '' \
+            '### Promotion checklist' \
+            '- [ ] CI passed on the source branch' \
+            '- [ ] Infrastructure what-if reviewed for unintended changes' \
+            '- [ ] Configuration or variable changes reviewed, including impact tier' \
+            '- [ ] Rollback path understood' \
+            '' \
+            "Commits ahead: ${{ steps.compare.outputs.ahead }}" \
+            "Source head: ${{ steps.compare.outputs.head-sha }}")"
 
           if [ -n "$existing" ]; then
             gh pr edit "$existing" --title "$title" --body "$body"

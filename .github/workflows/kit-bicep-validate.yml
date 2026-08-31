@@ -20,6 +20,25 @@ on:
           compiled output of <name>.bicep.
         type: boolean
         default: true
+      check-bicepconfig:
+        description: >-
+          Fail when the consumer's bicepconfig.json differs from the canonical
+          ruleset shipped with this kit. A lint gate every repo configures
+          differently is not a gate.
+        type: boolean
+        default: true
+      bicepconfig-path:
+        description: Path to the consumer's bicepconfig.json, relative to working-directory.
+        type: string
+        default: bicepconfig.json
+      vendored-kit-path:
+        description: >-
+          Directory holding vendored copies of this kit's files. Bicep has no
+          module registry here, so shared modules are copied in and this gate
+          proves the copy still matches the source. Paths inside mirror the kit
+          repository root. Skipped when the directory does not exist.
+        type: string
+        default: vendor/pawprint
       fail-on-lint-warning:
         description: >-
           Treat Bicep linter warnings as failures. Stale API versions and unused
@@ -61,6 +80,69 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
+
+      # The kit's own commit is the source of truth, so both drift checks below
+      # compare against exactly the ref the consumer pinned.
+      - name: Check out the kit
+        if: ${{ inputs.check-bicepconfig || inputs.vendored-kit-path != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ninjapaw/pawprint
+          ref: ${{ github.job_workflow_sha }}
+          path: .pawprint-kit
+
+      - name: Drift-check bicepconfig.json
+        if: ${{ inputs.check-bicepconfig }}
+        run: |
+          set -euo pipefail
+          canonical="$GITHUB_WORKSPACE/.pawprint-kit/bicepconfig.json"
+          local_config="${{ inputs.bicepconfig-path }}"
+          if [ ! -f "$canonical" ]; then
+            echo "::warning::Canonical bicepconfig.json unavailable; skipping the ruleset drift check."
+            exit 0
+          fi
+          if [ ! -f "$local_config" ]; then
+            echo "::error file=$local_config::$local_config is missing. Copy it from ninjapaw/pawprint so this repo lints against the shared ruleset."
+            exit 1
+          fi
+          if diff <(jq -S . "$canonical") <(jq -S . "$local_config") > /dev/null; then
+            echo "in sync: $local_config"
+          else
+            echo "::error file=$local_config::$local_config drifted from the canonical pawprint ruleset."
+            diff <(jq -S . "$canonical") <(jq -S . "$local_config") || true
+            exit 1
+          fi
+
+      - name: Drift-check vendored kit files
+        if: ${{ inputs.vendored-kit-path != '' }}
+        run: |
+          set -euo pipefail
+          vendored="${{ inputs.vendored-kit-path }}"
+          kit="$GITHUB_WORKSPACE/.pawprint-kit"
+          if [ ! -d "$vendored" ]; then
+            echo "No vendored kit directory at '$vendored'; nothing to check."
+            exit 0
+          fi
+          drifted=0
+          while IFS= read -r -d '' file; do
+            relative="${file#"$vendored"/}"
+            source_file="$kit/$relative"
+            if [ ! -f "$source_file" ]; then
+              echo "::error file=$file::$relative does not exist in the kit. Delete the vendored copy or upstream the file."
+              drifted=1
+              continue
+            fi
+            # Compared with line endings normalised: consumers and the kit are
+            # separate checkouts and a CRLF difference is not a fork.
+            if diff -q <(tr -d '\r' < "$source_file") <(tr -d '\r' < "$file") > /dev/null; then
+              echo "in sync: $file"
+            else
+              echo "::error file=$file::$relative drifted from the kit. Re-vendor it instead of editing the copy."
+              diff <(tr -d '\r' < "$source_file") <(tr -d '\r' < "$file") || true
+              drifted=1
+            fi
+          done < <(find "$vendored" -type f -print0)
+          exit $drifted
 
       - name: Install Bicep
         run: az bicep install
