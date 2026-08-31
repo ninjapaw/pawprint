@@ -46,7 +46,9 @@ if (values["verify-sources"]) {
     if (existsSync(join(REPO_ROOT, entry.path))) {
       process.stdout.write(`ok    ${entry.path}\n`);
     } else {
-      process.stderr.write(`FAIL  ${entry.path} is in the manifest but missing from this repository.\n`);
+      process.stderr.write(
+        `FAIL  ${entry.path} is in the manifest but missing from this repository.\n`,
+      );
       absent += 1;
     }
   }
@@ -60,7 +62,9 @@ if (values["verify-sources"]) {
 
 const targets = [...values.target, ...positionals];
 if (targets.length === 0) {
-  process.stderr.write("Specify at least one --target <path to consuming repository>, or --verify-sources.\n");
+  process.stderr.write(
+    "Specify at least one --target <path to consuming repository>, or --verify-sources.\n",
+  );
   process.exit(1);
 }
 
@@ -93,18 +97,25 @@ for (const target of targets) {
     const destination = join(targetRoot, VENDOR_PREFIX, entry.path);
 
     if (!existsSync(source)) {
-      process.stderr.write(`  FAIL  ${entry.path} is in the manifest but missing from this repository.\n`);
+      process.stderr.write(
+        `  FAIL  ${entry.path} is in the manifest but missing from this repository.\n`,
+      );
       missingSources += 1;
       continue;
     }
 
-    const requested = values.add.some((candidate) => candidate.split("\\").join("/") === entry.path);
+    const requested = values.add.some(
+      (candidate) => candidate.split("\\").join("/") === entry.path,
+    );
     if (!existsSync(destination) && !requested) {
       process.stdout.write(`  skip  ${entry.path} (not vendored here)\n`);
       continue;
     }
 
-    if (existsSync(destination) && normalise(source) === normalise(destination)) {
+    if (
+      existsSync(destination) &&
+      normalise(source) === normalise(destination)
+    ) {
       process.stdout.write(`  ok    ${entry.path}\n`);
       continue;
     }
@@ -118,18 +129,24 @@ for (const target of targets) {
     mkdirSync(dirname(destination), { recursive: true });
     copyFileSync(source, destination);
     copied += 1;
-    process.stdout.write(`  sync  ${relative(targetRoot, destination).split("\\").join("/")}\n`);
+    process.stdout.write(
+      `  sync  ${relative(targetRoot, destination).split("\\").join("/")}\n`,
+    );
   }
 }
 
 if (missingSources > 0) {
-  process.stderr.write(`\n${missingSources} manifest entr(y/ies) missing from this repository.\n`);
+  process.stderr.write(
+    `\n${missingSources} manifest entr(y/ies) missing from this repository.\n`,
+  );
   process.exit(1);
 }
 
 if (values.check) {
   if (drifted > 0) {
-    process.stderr.write(`\n${drifted} vendored file(s) drifted. Re-run without --check to re-vendor.\n`);
+    process.stderr.write(
+      `\n${drifted} vendored file(s) drifted. Re-run without --check to re-vendor.\n`,
+    );
     process.exit(1);
   }
   process.stdout.write("\nAll vendored files are in sync.\n");
