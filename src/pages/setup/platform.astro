@@ -1,0 +1,98 @@
+---
+import "../../styles/portal.css";
+import { ArrowLeft, RefreshCw, ShieldCheck } from "@lucide/astro";
+import Disclaimer from "../../components/Disclaimer.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Inventory and manage Ninja Paws platform connectors." />
+    <meta name="theme-color" content="#101820" />
+    <title>Platform connections | PawPrint Portal</title>
+  </head>
+  <body class="connector-body">
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Return to PawPrint Portal">
+        <img src="/pawprint-mark.svg" alt="" width="36" height="36" />
+        <span>Paw<strong>Print</strong> Portal</span>
+      </a>
+      <span class="connector-optional">Read-only first</span>
+      <a class="auth-link" href="/"><ArrowLeft aria-hidden="true" size={16} /> Back</a>
+    </header>
+
+    <main class="platform-main">
+      <div class="platform-heading">
+        <div>
+          <p class="eyebrow">Tenant and DevOps inventory</p>
+          <h1>Platform connections</h1>
+          <p>Discover existing integrations, adopt eligible resources into IaC, repair broken authorization, and inspect effective access before changing anything.</p>
+        </div>
+        <div class="platform-heading-actions">
+          <button type="button" data-platform-iac="preview">Preview declared IaC</button>
+          <button type="button" data-platform-iac="apply">Apply declared IaC</button>
+          <button type="button" class="scan-button" data-platform-refresh><RefreshCw aria-hidden="true" size={17} /> Scan again</button>
+        </div>
+      </div>
+
+      <section class="platform-summary" aria-label="Connector summary">
+        <div><strong data-count="managed">--</strong><span>managed</span></div>
+        <div><strong data-count="pre-existing">--</strong><span>pre-existing</span></div>
+        <div><strong data-count="needs-action">--</strong><span>needs action</span></div>
+        <div><strong data-count="eligible">--</strong><span>eligible</span></div>
+        <div><strong data-count="unavailable">--</strong><span>unavailable</span></div>
+      </section>
+
+      <section class="access-overview" aria-labelledby="access-title">
+        <div class="access-title">
+          <ShieldCheck aria-hidden="true" size={22} />
+          <div><p class="eyebrow">Effective permissions</p><h2 id="access-title">Your access</h2></div>
+        </div>
+        <div class="access-grid" data-access-grid><p>Scanning role assignments...</p></div>
+        <p class="owner-warning" data-owner-warning hidden>Owner is broader than routine platform management requires. Prefer Security Admin, Cloud Application Administrator, and Groups Administrator at the narrowest applicable scope; retain Owner only as governed break-glass access.</p>
+      </section>
+
+      <nav class="platform-filters" aria-label="Connector categories">
+        <button type="button" class="is-active" data-filter="all">All</button>
+        <button type="button" data-filter="defender">Defender</button>
+        <button type="button" data-filter="identity">Identity</button>
+        <button type="button" data-filter="devops">DevOps</button>
+        <button type="button" data-filter="dns">DNS</button>
+      </nav>
+
+      <section class="platform-inventory" aria-label="Connector inventory" data-platform-inventory>
+        <p>Scanning Azure, Entra, GitHub, and configured secret stores...</p>
+      </section>
+
+      <dialog class="lifecycle-dialog" data-lifecycle-dialog>
+        <form method="dialog"><button aria-label="Close">×</button></form>
+        <p class="eyebrow" data-dialog-mode></p>
+        <h2 data-dialog-title></h2>
+        <p data-dialog-summary></p>
+        <ol data-dialog-steps></ol>
+        <div class="dialog-actions">
+          <a data-dialog-link target="_blank" rel="noreferrer">Continue with provider</a>
+        </div>
+      </dialog>
+
+      <dialog class="lifecycle-dialog access-dialog" data-access-dialog>
+        <form method="dialog"><button aria-label="Close">×</button></form>
+        <p class="eyebrow">Enterprise application access</p>
+        <h2 data-access-title></h2>
+        <p data-access-message></p>
+        <form class="assignment-form" data-assignment-form hidden>
+          <label>Entra user or security group<select name="principalId" required></select></label>
+          <label>Application role<select name="appRoleId" required></select></label>
+          <button type="submit">Assign access</button>
+        </form>
+        <div class="assignment-list" data-assignment-list></div>
+      </dialog>
+
+      <p class="platform-message" data-platform-message aria-live="polite"></p>
+    </main>
+    <script is:inline src="/platform-setup.js"></script>
+  </body>
+</html>

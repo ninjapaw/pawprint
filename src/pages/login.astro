@@ -1,0 +1,35 @@
+---
+import "../styles/portal.css";
+import Disclaimer from "../components/Disclaimer.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Sign in to PawPrint Portal." />
+    <meta name="theme-color" content="#101820" />
+    <title>Sign in | PawPrint Portal</title>
+  </head>
+  <body class="login-body">
+    <Disclaimer />
+    <main class="login-shell">
+      <div class="brand login-brand">
+        <img src="/pawprint-mark.svg" alt="" width="36" height="36" />
+        <span>Paw<strong>Print</strong> Portal</span>
+      </div>
+      <p class="eyebrow">Ninja Paws / restricted control plane</p>
+      <h1>Choose your<br /><em>identity.</em></h1>
+      <p class="lede">Access requires a provider-specific invitation to the <strong>admin</strong> role.</p>
+      <div class="login-actions">
+        <a class="login-primary" href="/.auth/login/aad?post_login_redirect_uri=/">Continue with Microsoft Entra</a>
+        <a href="/.auth/login/github?post_login_redirect_uri=/">Continue with GitHub</a>
+      </div>
+      <p class="login-note">
+        Entra is recommended for workforce administration. GitHub supports the invited
+        operator account used to administer the <strong>ninjapaw</strong> organization.
+      </p>
+    </main>
+  </body>
+</html>

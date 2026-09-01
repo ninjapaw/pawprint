@@ -1,0 +1,99 @@
+---
+import "../../styles/portal.css";
+import { ArrowLeft, BadgeCheck, CloudCog, ExternalLink, KeyRound, Rocket } from "@lucide/astro";
+import Disclaimer from "../../components/Disclaimer.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Connect Cloudflare DNS to the Ninja Paws Azure deployment." />
+    <meta name="theme-color" content="#101820" />
+    <title>Cloudflare setup | PawPrint Portal</title>
+  </head>
+  <body class="connector-body">
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Return to PawPrint Portal">
+        <img src="/pawprint-mark.svg" alt="" width="36" height="36" />
+        <span>Paw<strong>Print</strong> Portal</span>
+      </a>
+      <span class="connector-optional">Optional connector</span>
+      <a class="auth-link" href="/"><ArrowLeft aria-hidden="true" size={16} /> Back</a>
+    </header>
+
+    <main class="connector-main">
+      <div class="connector-heading">
+        <CloudCog aria-hidden="true" size={30} />
+        <div>
+          <p class="eyebrow">External DNS / guided setup</p>
+          <h1>Cloudflare DNS</h1>
+          <p>Connect the <strong>ninjapaws.org</strong> zone without moving application infrastructure out of Azure.</p>
+        </div>
+      </div>
+
+      <aside class="ownership-band" aria-label="Infrastructure ownership">
+        <div><strong>Shared framework</strong><span>Bicep Static Web App module, DNS connector, permission verification</span></div>
+        <div><strong>Repository-owned</strong><span>Zone name, custom hostname, GitHub Environment secret</span></div>
+        <div><strong>Cloudflare-managed</strong><span>One validation TXT and one DNS-only CNAME</span></div>
+      </aside>
+
+      <ol class="connector-steps">
+        <li class="connector-step">
+          <div class="step-number">1</div>
+          <div>
+            <h2>Create a service token</h2>
+            <p>In Cloudflare, create an account-owned API token scoped only to <strong>ninjapaws.org</strong>. Grant <strong>Zone Read</strong> and <strong>DNS Write</strong>. No account settings, Workers, TLS, WAF, or global API key.</p>
+            <a class="step-action" href="https://dash.cloudflare.com/" target="_blank" rel="noreferrer">Open Cloudflare <ExternalLink aria-hidden="true" size={16} /></a>
+          </div>
+        </li>
+
+        <li class="connector-step">
+          <div class="step-number">2</div>
+          <div>
+            <h2>Verify and store</h2>
+            <p>PawPrint checks the active zone, creates and removes a temporary TXT probe, then sends the token over stdin to GitHub Environment secrets for Site development and production.</p>
+            <form class="guided-token-form" data-cloudflare-form>
+              <label for="cloudflare-token"><KeyRound aria-hidden="true" size={16} /> Account API token</label>
+              <div>
+                <input id="cloudflare-token" name="token" type="password" autocomplete="off" spellcheck="false" required minlength="20" />
+                <button type="submit">Verify and store</button>
+              </div>
+            </form>
+          </div>
+        </li>
+
+        <li class="connector-step">
+          <div class="step-number">3</div>
+          <div>
+            <h2>Confirm connection</h2>
+            <dl class="guided-status" data-cloudflare-status>
+              <div><dt>Development</dt><dd>Checking</dd></div>
+              <div><dt>Production</dt><dd>Checking</dd></div>
+              <div><dt>Token expiry</dt><dd>Checking</dd></div>
+              <div><dt>Deployment workflow</dt><dd>Checking</dd></div>
+            </dl>
+            <p class="guided-message" data-cloudflare-message aria-live="polite">No token is retained by this browser or written to disk.</p>
+          </div>
+        </li>
+
+        <li class="connector-step">
+          <div class="step-number">4</div>
+          <div>
+            <h2>Deploy and bind</h2>
+            <p>The Site workflow deploys Azure with Bicep, reconciles the two Cloudflare records, then converges the Azure custom-domain resource through Bicep before publishing the application. Review and push the workflow changes to the <strong>dev</strong> branch first; the button remains disabled until both the workflow and token are ready.</p>
+            <button type="button" class="step-action deploy-action" data-cloudflare-deploy disabled><Rocket aria-hidden="true" size={16} /> Deploy Site</button>
+          </div>
+        </li>
+      </ol>
+
+      <div class="connector-result" data-connector-result hidden>
+        <BadgeCheck aria-hidden="true" size={20} />
+        <span></span>
+      </div>
+    </main>
+    <script is:inline src="/cloudflare-setup.js"></script>
+  </body>
+</html>

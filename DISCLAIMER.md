@@ -26,6 +26,52 @@ them in any tenant, subscription, production environment, customer engagement, o
 business decision. Microsoft Corporation, GitHub, Inc., and contributors are not
 responsible for your use of these materials.
 
+## PawPrint Operational Notice
+
+PawPrint can inspect and modify cloud resources, identity objects, role and
+application assignments, DevOps organizations, repositories, DNS records,
+security connectors, deployment workflows, and stored configuration. Use it
+only where you have explicit authorization and after reviewing the requested
+scope, permissions, cost, and provider-side consent.
+
+Deployment, remediation, disable, remove, rotate, and delete/re-create actions
+can cause resource replacement, irreversible deletion, data loss, downtime,
+configuration drift, access loss, service interruption, unexpected charges,
+security exposure, or a security incident. Maintain tested backups and recovery
+access, preview changes, use non-production environments first, and verify every
+control plane after an operation. No workflow, connector, scan, recommendation,
+or report guarantees prevention, detection, remediation, compliance,
+availability, or freedom from breach.
+
+Cost and licensing information may be delayed, estimated, incomplete,
+throttled, or unavailable. A displayed budget remainder is not a credit balance,
+invoice, spending limit, or guarantee. Verify prices, commitments, quotas,
+licenses, taxes, Product Terms, and billing data through official sources.
+
+PawPrint prefers workload identity, managed identity, and narrowly scoped
+service tokens, and avoids returning secret values through its APIs. Operators
+remain responsible for issuing, entering, storing, rotating, revoking, and
+recovering credentials and for reviewing third-party application consent.
+Provider-side authorization may survive deletion of an Azure resource and must
+be removed independently.
+
+Local plans and evidence can contain tenant, subscription, resource, hostname,
+cost, and operator identifiers. Hosted authentication can use necessary Azure
+Static Web Apps cookies. PawPrint does not add advertising analytics. Redact
+artifacts before sharing and follow your own privacy, retention, residency, and
+regulatory obligations.
+
+Some scenarios intentionally deploy vulnerable or publicly reachable resources.
+Generated names, plans, scripts, infrastructure as code, recommendations, and
+AI-assisted output require human review and may be incorrect, outdated,
+insecure, noncompliant, destructive, or unsuitable for production.
+
+The software is provided under its repository license and on an "as is" basis,
+without warranties or guarantees. To the extent permitted by that license and
+applicable law, Microsoft Corporation, GitHub, Inc., Cloudflare, Inc., other
+referenced providers, Ninja Paws contributors, and contributors' employers are
+not responsible for losses arising from deployment or use of these materials.
+
 Microsoft product names, service names, trademarks, and logos are owned by
 Microsoft Corporation. GitHub product names, service names, trademarks, and logos
 are owned by GitHub, Inc. Use of those names is for identification and

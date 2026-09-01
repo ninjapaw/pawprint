@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">PawPrint mark</title>
+  <desc id="desc">A paw inside the Ninja Paws shield</desc>
+  <rect width="240" height="240" rx="48" fill="#101820"/>
+  <path d="M120 28 194 56v54c0 48-31 80-74 102-43-22-74-54-74-102V56l74-28Z" fill="#00a4ef"/>
+  <path d="M120 45 178 67v43c0 37-22 63-58 83-36-20-58-46-58-83V67l58-22Z" fill="#101820"/>
+  <g fill="#fbfaf7">
+    <ellipse cx="120" cy="139" rx="28" ry="36"/>
+    <ellipse cx="78" cy="117" rx="13" ry="19" transform="rotate(-28 78 117)"/>
+    <ellipse cx="162" cy="117" rx="13" ry="19" transform="rotate(28 162 117)"/>
+    <ellipse cx="96" cy="91" rx="12" ry="18" transform="rotate(-42 96 91)"/>
+    <ellipse cx="144" cy="91" rx="12" ry="18" transform="rotate(42 144 91)"/>
+  </g>
+  <circle cx="190" cy="190" r="19" fill="#91e6bd"/>
+</svg>

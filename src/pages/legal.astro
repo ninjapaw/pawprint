@@ -1,0 +1,49 @@
+---
+import "../styles/portal.css";
+import Disclaimer from "../components/Disclaimer.astro";
+import { ArrowLeft, ExternalLink, ShieldAlert } from "@lucide/astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="PawPrint safety, privacy, and responsibility notice." />
+    <meta name="theme-color" content="#101820" />
+    <title>Safety and responsibility | PawPrint Portal</title>
+  </head>
+  <body>
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Return to PawPrint Portal"><img src="/pawprint-mark.svg" alt="" width="36" height="36" /><span>Paw<strong>Print</strong> Portal</span></a>
+      <span class="connector-optional">Safety notice</span>
+      <a class="auth-link" href="/"><ArrowLeft aria-hidden="true" size={16} /> Back</a>
+    </header>
+    <main class="legal-main">
+      <div class="legal-heading">
+        <ShieldAlert aria-hidden="true" size={30} />
+        <div><p class="eyebrow">Before deployment</p><h1>Review before you run.</h1><p>PawPrint can inspect and change cloud, identity, DevOps, DNS, and security configuration. Automation reduces repetition; it does not transfer operational responsibility.</p></div>
+      </div>
+
+      <section class="legal-grid" aria-label="Safety and responsibility details">
+        <article><h2>Independent status</h2><p>PawPrint and other Ninja Paws repositories are independent community and demonstration projects. They are not official products, assessments, certifications, support offerings, or guidance from Microsoft, GitHub, Cloudflare, or another referenced provider. Contributor employment does not imply endorsement.</p></article>
+        <article><h2>Authorized use</h2><p>You are responsible for authorization to access every tenant, subscription, organization, repository, domain, account, and dataset you connect. Do not use the platform to bypass approval, policy, licensing, contractual, regulatory, or provider requirements.</p></article>
+        <article><h2>Operational risk</h2><p>Deployments and lifecycle actions can cause replacement, deletion, data loss, downtime, configuration drift, access loss, unexpected charges, security exposure, or a security incident. Preview changes, maintain backups and recovery access, test outside production, and confirm scope before applying.</p></article>
+        <article><h2>Security outcomes</h2><p>No scan, connector, recommendation, control, or generated report guarantees prevention, detection, remediation, compliance, availability, or freedom from breach. Validate results against your threat model, official documentation, and qualified security or compliance review.</p></article>
+        <article><h2>Costs and licensing</h2><p>Cost data can be delayed, incomplete, estimated, throttled, or unavailable. “Remaining” means configured budget minus reported actual cost, not cash, credit, an invoice, or a spending guarantee. Verify pricing, quotas, licenses, Product Terms, taxes, and commitments with official sources.</p></article>
+        <article><h2>Credentials and connectors</h2><p>Use workload identity, managed identity, account-owned service tokens, and least privilege where supported. PawPrint avoids displaying secret values, but you remain responsible for credential issuance, secure entry, rotation, revocation, recovery, provider consent, and reviewing third-party application access.</p></article>
+        <article><h2>Data and privacy</h2><p>The local portal queries your signed-in Azure, Microsoft Graph, GitHub, and configured provider sessions. Local plans and evidence may contain tenant, subscription, resource, hostname, cost, and operator identifiers. PawPrint adds no advertising analytics; hosted authentication may use necessary Azure Static Web Apps authentication cookies. Redact before sharing.</p></article>
+        <article><h2>Scenarios and generated output</h2><p>Some scenarios intentionally deploy vulnerable or publicly reachable resources. Generated names, plans, scripts, IaC, recommendations, and AI-assisted output require human review. Never assume generated output is correct, current, secure, compliant, reversible, or suitable for production.</p></article>
+        <article><h2>Disable, remove, and recovery</h2><p>Disabling a connector may stop collection without deleting provider access. Removing Azure state may not revoke third-party consent, delete retained data, release globally unique names, shorten immutable retention, or restore prior configuration. Verify cleanup independently in every control plane.</p></article>
+        <article><h2>Warranty and responsibility</h2><p>The software is provided under its repository license and on an “as is” basis, without warranties or guarantees. To the extent permitted by the license and applicable law, Microsoft, GitHub, Cloudflare, Ninja Paws contributors, and other referenced providers are not responsible for losses arising from your deployment or use.</p></article>
+      </section>
+
+      <section class="legal-reporting">
+        <h2>Report security issues privately</h2>
+        <p>Do not place credentials, tokens, tenant data, customer data, private keys, logs, or exploit details in public issues. Use the repository Security tab and the private process in SECURITY.md.</p>
+        <div><a href="https://github.com/ninjapaw/pawprint/security" target="_blank" rel="noreferrer">Security reporting <ExternalLink aria-hidden="true" size={15} /></a><a href="https://github.com/ninjapaw/pawprint/blob/dev/DISCLAIMER.md" target="_blank" rel="noreferrer">Full repository disclaimer <ExternalLink aria-hidden="true" size={15} /></a></div>
+      </section>
+    </main>
+  </body>
+</html>

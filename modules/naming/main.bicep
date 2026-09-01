@@ -16,6 +16,8 @@ param projectSlug string
 @allowed([
   'dev'
   'prod'
+  'qa'
+  'test'
 ])
 param environmentName string
 

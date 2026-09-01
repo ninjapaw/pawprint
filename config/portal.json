@@ -1,0 +1,99 @@
+{
+  "environment": "dev",
+  "workloads": [
+    {
+      "id": "m365profiles",
+      "label": "M365 Profiles",
+      "description": "Identity and licensing guidance, published as an Azure Static Web App.",
+      "repository": "ninjapaw/m365profiles",
+      "siteUrl": "https://dev.m365profiles.com/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        {
+          "label": "Infrastructure",
+          "workflow": "deploy-azure-infrastructure.yml",
+          "inputs": {
+            "environment": "dev",
+            "operation": "deploy",
+            "site-sku": "Free"
+          }
+        },
+        {
+          "label": "Application",
+          "workflow": "deploy.yml",
+          "inputs": {
+            "environment": "dev"
+          }
+        }
+      ]
+    },
+    {
+      "id": "site",
+      "label": "Ninja Paws Site",
+      "description": "The public Ninja Paws site and project directory.",
+      "repository": "ninjapaw/site",
+      "siteUrl": "https://dev.ninjapaws.org/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        {
+          "label": "Infrastructure",
+          "workflow": "deploy-azure-infrastructure.yml",
+          "inputs": {
+            "environment": "dev",
+            "operation": "deploy"
+          }
+        },
+        {
+          "label": "Application",
+          "workflow": "deploy.yml",
+          "inputs": {
+            "environment": "dev"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sentinel-optimizer",
+      "label": "Sentinel Optimizer",
+      "description": "Security telemetry cost analysis with a Static Web App and Azure Functions API.",
+      "repository": "ninjapaw/sentinel-optimizer",
+      "siteUrl": "https://dev.sentineloptimizer.com/",
+      "statusWorkflow": "deploy-application.yml",
+      "steps": [
+        {
+          "label": "Infrastructure",
+          "workflow": "deploy-azure-infrastructure.yml",
+          "inputs": {
+            "component": "all",
+            "environment": "dev",
+            "operation": "deploy"
+          }
+        },
+        {
+          "label": "Application",
+          "workflow": "deploy-application.yml",
+          "inputs": {
+            "environment": "dev"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ninjapaws-cloud-security-dojo",
+      "label": "Cloud Security Dojo",
+      "description": "The deliberately vulnerable container-security training estate.",
+      "repository": "ninjapaw/ninjapaws-cloud-security-dojo",
+      "siteUrl": "https://ninjapaws-dojo-app-dev.azurewebsites.net/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        {
+          "label": "Full deployment",
+          "workflow": "deploy.yml",
+          "inputs": {
+            "stage": "full"
+          }
+        }
+      ]
+    }
+  ]
+}

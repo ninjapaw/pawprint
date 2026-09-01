@@ -40,11 +40,16 @@ function baseConfig(overrides = {}) {
     defaults: {
       location: "centralus",
       siteBase: "/",
+      dns: {
+        provider: "cloudflare",
+        zoneName: "example.com",
+      },
       resolver: {
         required: ["staticWebAppName", "publicSiteUrl"],
         env: {
           AZURE_STATIC_WEB_APP_NAME: "staticWebAppName",
           PUBLIC_SITE_BASE: "siteBase",
+          CLOUDFLARE_ZONE_NAME: "dns.zoneName",
         },
       },
       ...overrides.defaults,
@@ -327,6 +332,7 @@ accepts(
       "AZURE_RESOURCE_GROUP=NP-Example-Dev-CentralUS",
       "AZURE_STATIC_WEB_APP_NAME=np-example-dev-centralus",
       "PUBLIC_SITE_BASE=/",
+      "CLOUDFLARE_ZONE_NAME=example.com",
     ];
     const missing = expected.filter((line) => !lines.includes(line));
     return missing.length ? `missing ${missing.join(", ")}` : null;

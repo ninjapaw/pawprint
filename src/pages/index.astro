@@ -1,0 +1,169 @@
+---
+import "../styles/portal.css";
+import { CloudCog, Network, Play, RefreshCw, Settings, ShieldCheck } from "@lucide/astro";
+import Disclaimer from "../components/Disclaimer.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="PawPrint deployment control plane for Ninja Paws cloud workloads."
+    />
+    <meta name="theme-color" content="#101820" />
+    <title>PawPrint Portal</title>
+  </head>
+  <body>
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="PawPrint Portal home">
+        <img src="/pawprint-mark.svg" alt="" width="36" height="36" />
+        <span>Paw<strong>Print</strong> Portal</span>
+      </a>
+      <div class="connection" data-connection>
+        <span class="status-dot"></span>
+        <span>Connecting</span>
+      </div>
+      <a class="auth-link" href="/.auth/login/aad?post_login_redirect_uri=/" data-auth-link>Sign in with Microsoft</a>
+    </header>
+
+    <main>
+      <section class="command-band" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Ninja Paws / deployment control</p>
+          <h1 id="page-title">Ship with<br /><em>receipts.</em></h1>
+          <p class="lede">
+            One view for platform health, deployments, and the exact workflow
+            behind every action.
+          </p>
+        </div>
+        <div class="command-panel">
+          <div class="command-heading">
+            <span>Development</span>
+            <span class="mode-badge">safe default</span>
+          </div>
+          <button class="deploy-all" type="button" data-action="deploy-all" data-local-only>
+            <Play aria-hidden="true" size={18} stroke-width={2.4} />
+            Deploy all development workloads
+          </button>
+          <p data-mode-copy>Infrastructure runs before application publishing. Failed stages stop their workload.</p>
+        </div>
+      </section>
+
+      <section class="summary-strip" aria-label="Platform summary">
+        <div><strong data-summary="ready">--</strong><span>ready</span></div>
+        <div><strong data-summary="running">--</strong><span>running</span></div>
+        <div><strong data-summary="attention">--</strong><span>attention</span></div>
+        <button type="button" class="refresh-button" data-refresh aria-label="Refresh deployment status" title="Refresh deployment status"><RefreshCw aria-hidden="true" size={20} /></button>
+      </section>
+
+      <section class="workloads" aria-labelledby="workloads-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Current estate</p>
+            <h2 id="workloads-title">Workloads</h2>
+          </div>
+          <p>Actions are allowlisted by PawPrint. Browser input never becomes a shell command.</p>
+        </div>
+        <div class="workload-grid" data-workloads aria-live="polite">
+          <p class="loading">Loading deployment state...</p>
+        </div>
+      </section>
+
+      <section class="activity" aria-labelledby="activity-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Operator trail</p>
+            <h2 id="activity-title">Activity</h2>
+          </div>
+        </div>
+        <ol class="activity-list" data-activity>
+          <li>Waiting for the local controller.</li>
+        </ol>
+      </section>
+
+      <section class="setup" aria-labelledby="setup-title" data-local-setup hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Local administration</p>
+            <h2 id="setup-title">GitHub App setup</h2>
+          </div>
+          <div class="admin-heading-actions">
+            <a href="/setup/first-run/"><Settings aria-hidden="true" size={16} /> First-run wizard</a>
+            <a href="/setup/platform/"><Network aria-hidden="true" size={16} /> Platform connections</a>
+          </div>
+        </div>
+        <div class="setup-grid">
+          <article class="setup-panel setup-status">
+            <div class="setup-panel-heading">
+              <Settings aria-hidden="true" size={21} />
+              <h3>Readiness</h3>
+            </div>
+            <dl data-setup-status>
+              <div><dt>GitHub organization</dt><dd>Checking</dd></div>
+              <div><dt>Azure subscription</dt><dd>Checking</dd></div>
+              <div><dt>GitHub App</dt><dd>Checking</dd></div>
+              <div><dt>Hosted dispatch</dt><dd>Checking</dd></div>
+            </dl>
+          </article>
+          <article class="setup-panel">
+            <div class="setup-panel-heading">
+              <ShieldCheck aria-hidden="true" size={21} />
+              <h3>Requested access</h3>
+            </div>
+            <div class="permission-row"><span>Repository metadata</span><strong>read</strong></div>
+            <div class="permission-row"><span>GitHub Actions</span><strong>write</strong></div>
+            <p class="setup-note">No contents, secrets, administration, webhook, or user-token permission.</p>
+            <ul class="repository-list" data-setup-repositories></ul>
+          </article>
+          <article class="setup-panel setup-storage">
+            <h3>Credential destinations</h3>
+            <dl>
+              <div><dt>Private key</dt><dd>Azure Key Vault</dd></div>
+              <div><dt>App and installation IDs</dt><dd>GitHub Environment variables</dd></div>
+              <div><dt>Deployment token</dt><dd>GitHub Environment secret</dd></div>
+              <div><dt>Operator login</dt><dd>Existing Azure and GitHub CLI sessions</dd></div>
+            </dl>
+          </article>
+          <article class="setup-panel setup-actions">
+            <h3>Actions</h3>
+            <button type="button" class="setup-primary" data-setup-action="create">Create and install App</button>
+            <button type="button" data-setup-action="audit">Audit installation</button>
+            <button type="button" data-setup-action="enable">Audit and enable</button>
+            <button type="button" data-setup-action="disable">Disable hosted dispatch</button>
+            <p class="setup-message" data-setup-message aria-live="polite">Loading setup state...</p>
+          </article>
+          <article class="setup-panel setup-cloudflare">
+            <div class="setup-panel-heading">
+              <CloudCog aria-hidden="true" size={21} />
+              <h3>Cloudflare DNS</h3>
+            </div>
+            <div class="cloudflare-layout">
+              <dl data-cloudflare-status>
+                <div><dt>Zone</dt><dd>Checking</dd></div>
+                <div><dt>Development</dt><dd>Checking</dd></div>
+                <div><dt>Production</dt><dd>Checking</dd></div>
+                <div><dt>Token expiry</dt><dd>Checking</dd></div>
+              </dl>
+              <div class="cloudflare-actions">
+                <a class="setup-link setup-primary" href="/setup/cloudflare/">Open guided setup</a>
+                <button type="button" class="cloudflare-deploy" data-action="site" data-cloudflare-deploy disabled>Deploy site</button>
+                <p class="setup-note">Optional connector. Azure stays Bicep-managed; Cloudflare owns only the required DNS records.</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>PawPrint is an independent Ninja Paws community project.</span>
+      <span class="footer-links"><a href="/legal/">Safety &amp; privacy</a><a href="https://github.com/ninjapaw/pawprint" target="_blank" rel="noreferrer">Source ↗</a></span>
+    </footer>
+
+    <script is:inline src="/portal.js"></script>
+  </body>
+</html>

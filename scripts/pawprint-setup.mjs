@@ -25,6 +25,7 @@ import { stdin, stdout } from "node:process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { githubEnvironmentSubject } from "./github-oidc-subject.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG_PATH = resolve(REPO_ROOT, "config/deploy.config.json");
@@ -37,9 +38,19 @@ const ROLE_TEMPLATES = {
 };
 
 const APP_ROLES = [
-  { value: "Pawprint.Admin", description: "Configure identity, sinks and environments; perform destructive operations." },
-  { value: "Pawprint.Operator", description: "Deploy, remediate and destroy runs." },
-  { value: "Pawprint.Reader", description: "View pawprints and configuration." },
+  {
+    value: "Pawprint.Admin",
+    description:
+      "Configure identity, sinks and environments; perform destructive operations.",
+  },
+  {
+    value: "Pawprint.Operator",
+    description: "Deploy, remediate and destroy runs.",
+  },
+  {
+    value: "Pawprint.Reader",
+    description: "View pawprints and configuration.",
+  },
 ];
 
 const PAWPRINT_TAG = "pawprint-managed";
@@ -93,13 +104,20 @@ function assertSafeArgs(args) {
 
 function az(args, { allowFailure = false } = {}) {
   assertSafeArgs(args);
-  const result = spawnSync(AZ_BIN, args, { encoding: "utf8", shell: NEEDS_SHELL });
+  const result = spawnSync(AZ_BIN, args, {
+    encoding: "utf8",
+    shell: NEEDS_SHELL,
+  });
   if (result.error && result.error.code === "ENOENT") {
-    throw new SetupError("Azure CLI not found on PATH. Install it, or run with --mode local.");
+    throw new SetupError(
+      "Azure CLI not found on PATH. Install it, or run with --mode local.",
+    );
   }
   if (result.status !== 0) {
     if (allowFailure) return null;
-    throw new SetupError(`az ${args.join(" ")} failed:\n${(result.stderr || result.stdout || "").trim()}`);
+    throw new SetupError(
+      `az ${args.join(" ")} failed:\n${(result.stderr || result.stdout || "").trim()}`,
+    );
   }
   const output = (result.stdout || "").trim();
   if (!output) return null;
@@ -111,7 +129,9 @@ function az(args, { allowFailure = false } = {}) {
 }
 
 function graph(url, { allowFailure = true } = {}) {
-  return az(["rest", "--method", "get", "--url", url, "-o", "json"], { allowFailure });
+  return az(["rest", "--method", "get", "--url", url, "-o", "json"], {
+    allowFailure,
+  });
 }
 
 /**
@@ -127,16 +147,44 @@ function graphWrite(method, url, body) {
     assertSafeArgs([url]);
     const result = spawnSync(
       AZ_BIN,
-      ["rest", "--method", method, "--url", url, "--headers", "Content-Type=application/json", "--body", `@${relativePath}`, "-o", "json"],
+      [
+        "rest",
+        "--method",
+        method,
+        "--url",
+        url,
+        "--headers",
+        "Content-Type=application/json",
+        "--body",
+        `@${relativePath}`,
+        "-o",
+        "json",
+      ],
       { encoding: "utf8", shell: NEEDS_SHELL, cwd: REPO_ROOT },
     );
     if (result.status !== 0) {
-      throw new SetupError(`Graph ${method.toUpperCase()} ${url} failed:\n${(result.stderr || result.stdout || "").trim()}`);
+      throw new SetupError(
+        `Graph ${method.toUpperCase()} ${url} failed:\n${(result.stderr || result.stdout || "").trim()}`,
+      );
     }
     const output = (result.stdout || "").trim();
     return output ? JSON.parse(output) : null;
   } finally {
     rmSync(absolutePath, { force: true });
+  }
+}
+
+function graphDelete(url) {
+  assertSafeArgs([url]);
+  const result = spawnSync(
+    AZ_BIN,
+    ["rest", "--method", "delete", "--url", url, "-o", "none"],
+    { encoding: "utf8", shell: NEEDS_SHELL, cwd: REPO_ROOT },
+  );
+  if (result.status !== 0) {
+    throw new SetupError(
+      `Graph DELETE ${url} failed:\n${(result.stderr || result.stdout || "").trim()}`,
+    );
   }
 }
 
@@ -153,7 +201,11 @@ function writeInstallManifest({ tenantId, operator }) {
     adminConsentGranted: false,
     irreversible: [],
   };
-  writeFileSync(INSTALL_MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(
+    INSTALL_MANIFEST_PATH,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    { mode: 0o600 },
+  );
   return manifest;
 }
 
@@ -161,10 +213,16 @@ const GH_BIN = NEEDS_SHELL ? "gh.exe" : "gh";
 
 function gh(args, { allowFailure = true, input } = {}) {
   assertSafeArgs(args.filter((arg) => !arg.startsWith("{")));
-  const result = spawnSync(GH_BIN, args, { encoding: "utf8", shell: NEEDS_SHELL, input });
+  const result = spawnSync(GH_BIN, args, {
+    encoding: "utf8",
+    shell: NEEDS_SHELL,
+    input,
+  });
   if (result.status !== 0) {
     if (allowFailure) return null;
-    throw new SetupError(`gh ${args.join(" ")} failed:\n${(result.stderr || result.stdout || "").trim()}`);
+    throw new SetupError(
+      `gh ${args.join(" ")} failed:\n${(result.stderr || result.stdout || "").trim()}`,
+    );
   }
   return (result.stdout || "").trim() || null;
 }
@@ -176,17 +234,38 @@ function gh(args, { allowFailure = true, input } = {}) {
  * `environment:` presents `repo:<owner>/<repo>:environment:<name>`, and a ref-based
  * credential will simply not match.
  */
-function federateEnvironment({ appObjectId, repository, environmentName, branch, clientId, tenantId, subscriptionId }) {
+function federateEnvironment({
+  appObjectId,
+  repositoryMetadata,
+  environmentName,
+  branch,
+  clientId,
+  tenantId,
+  subscriptionId,
+}) {
+  const repository = `${repositoryMetadata.owner.login}/${repositoryMetadata.name}`;
   const credentialName = `github-${environmentName}`;
-  const subject = `repo:${repository}:environment:${environmentName}`;
+  const subject = githubEnvironmentSubject(repositoryMetadata, environmentName);
 
   const existing = graph(
     `https://graph.microsoft.com/v1.0/applications/${appObjectId}/federatedIdentityCredentials`,
   )?.value?.find((credential) => credential.name === credentialName);
 
-  if (existing) {
-    stdout.write(`   ${style.dim("skip")}  federated credential ${credentialName} already exists\n`);
+  if (
+    existing?.subject === subject &&
+    existing.issuer === "https://token.actions.githubusercontent.com" &&
+    existing.audiences?.length === 1 &&
+    existing.audiences[0] === "api://AzureADTokenExchange"
+  ) {
+    stdout.write(
+      `   ${style.dim("skip")}  federated credential ${credentialName} already exists\n`,
+    );
   } else {
+    if (existing?.id) {
+      graphDelete(
+        `https://graph.microsoft.com/v1.0/applications/${appObjectId}/federatedIdentityCredentials/${existing.id}`,
+      );
+    }
     const credential = graphWrite(
       "post",
       `https://graph.microsoft.com/v1.0/applications/${appObjectId}/federatedIdentityCredentials`,
@@ -206,27 +285,65 @@ function federateEnvironment({ appObjectId, repository, environmentName, branch,
         displayName: credentialName,
       });
     }
-    stdout.write(`   ${style.good("ok")}    federated credential ${credentialName}\n`);
+    stdout.write(
+      `   ${style.good("ok")}    federated credential ${credentialName}\n`,
+    );
     stdout.write(style.dim(`         subject ${subject}\n`));
   }
 
   // Restricts which branch may deploy to this environment, so production cannot be
   // deployed from an arbitrary branch.
-  gh(["api", "--method", "PUT", `repos/${repository}/environments/${environmentName}`, "--silent", "--input", "-"], {
-    input: JSON.stringify({
-      deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-    }),
-  });
-  gh([
-    "api",
-    "--method",
-    "POST",
-    `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
-    "--field",
-    `name=${branch}`,
-    "--silent",
-  ]);
-  stdout.write(`   ${style.good("ok")}    environment ${environmentName} restricted to branch ${branch}\n`);
+  gh(
+    [
+      "api",
+      "--method",
+      "PUT",
+      `repos/${repository}/environments/${environmentName}`,
+      "--silent",
+      "--input",
+      "-",
+    ],
+    {
+      allowFailure: false,
+      input: JSON.stringify({
+        deployment_branch_policy: {
+          protected_branches: false,
+          custom_branch_policies: true,
+        },
+      }),
+    },
+  );
+  gh(
+    [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+      "--field",
+      `name=${branch}`,
+      "--silent",
+    ],
+    { allowFailure: false },
+  );
+  const policies = JSON.parse(
+    gh(
+      [
+        "api",
+        `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+      ],
+      { allowFailure: false },
+    ),
+  );
+  if (
+    !(policies.branch_policies ?? []).some((policy) => policy.name === branch)
+  ) {
+    throw new SetupError(
+      `GitHub environment '${environmentName}' is not bound to '${branch}' after configuration.`,
+    );
+  }
+  stdout.write(
+    `   ${style.good("ok")}    environment ${environmentName} restricted to branch ${branch}\n`,
+  );
 
   // Identifiers only. There is no secret to set, because federation replaces it.
   for (const [name, value] of Object.entries({
@@ -234,9 +351,26 @@ function federateEnvironment({ appObjectId, repository, environmentName, branch,
     AZURE_TENANT_ID: tenantId,
     AZURE_SUBSCRIPTION_ID: subscriptionId,
   })) {
-    gh(["variable", "set", name, "--env", environmentName, "--repo", repository, "--body", value]);
+    gh(
+      [
+        "variable",
+        "set",
+        name,
+        "--env",
+        environmentName,
+        "--repo",
+        repository,
+        "--body",
+        value,
+      ],
+      {
+        allowFailure: false,
+      },
+    );
   }
-  stdout.write(`   ${style.good("ok")}    3 identity variables set on ${environmentName}\n`);
+  stdout.write(
+    `   ${style.good("ok")}    3 identity variables set on ${environmentName}\n`,
+  );
 }
 
 async function main() {
@@ -286,9 +420,13 @@ async function main() {
 
     // ---------------------------------------------------------------- detect
     stdout.write(style.head("1. Detecting your Azure context"));
-    const account = az(["account", "show", "-o", "json"], { allowFailure: true });
+    const account = az(["account", "show", "-o", "json"], {
+      allowFailure: true,
+    });
     if (!account) {
-      throw new SetupError("Not signed in to Azure. Run 'az login' first, or choose local mode with --mode local.");
+      throw new SetupError(
+        "Not signed in to Azure. Run 'az login' first, or choose local mode with --mode local.",
+      );
     }
     stdout.write(
       `   subscription  ${account.name} (${account.id})\n` +
@@ -322,30 +460,43 @@ async function main() {
             "   See README.md for the identity guidance.\n",
         ),
       );
-      if (!(await confirm("   Continue with an external tenant anyway?", "n"))) {
-        throw new SetupError("Cancelled. Re-run and choose 'entra' to use your workforce tenant.");
+      if (
+        !(await confirm("   Continue with an external tenant anyway?", "n"))
+      ) {
+        throw new SetupError(
+          "Cancelled. Re-run and choose 'entra' to use your workforce tenant.",
+        );
       }
     }
 
     // --------------------------------------------------------- pick tenant
     stdout.write(style.head("3. Choosing a directory"));
-    const tenants = az(["account", "tenant", "list", "-o", "json"], { allowFailure: true }) ?? [];
-    const listed = tenants.length > 0 ? tenants : [{ tenantId: account.tenantId }];
+    const tenants =
+      az(["account", "tenant", "list", "-o", "json"], { allowFailure: true }) ??
+      [];
+    const listed =
+      tenants.length > 0 ? tenants : [{ tenantId: account.tenantId }];
 
     // az account tenant list often omits the display name and domain, which
     // makes the picker useless. Fill in what Graph can tell us about the tenant
     // we are currently signed in to.
-    const organisation = graph("https://graph.microsoft.com/v1.0/organization")?.value?.[0];
+    const organisation = graph("https://graph.microsoft.com/v1.0/organization")
+      ?.value?.[0];
     for (const tenant of listed) {
       if (tenant.tenantId !== account.tenantId) continue;
       tenant.displayName ??= organisation?.displayName;
-      tenant.defaultDomain ??= organisation?.verifiedDomains?.find((domain) => domain.isDefault)?.name;
+      tenant.defaultDomain ??= organisation?.verifiedDomains?.find(
+        (domain) => domain.isDefault,
+      )?.name;
     }
 
     listed.forEach((tenant, index) => {
       const bound = tenant.tenantId === account.tenantId;
-      const domain = tenant.defaultDomain ?? tenant.domains?.[0] ?? tenant.tenantId;
-      const kind = String(domain).includes("ciamlogin.com") ? " (external)" : "";
+      const domain =
+        tenant.defaultDomain ?? tenant.domains?.[0] ?? tenant.tenantId;
+      const kind = String(domain).includes("ciamlogin.com")
+        ? " (external)"
+        : "";
       stdout.write(
         `   [${index + 1}] ${(tenant.displayName ?? "unnamed").padEnd(32)} ${String(domain).padEnd(34)}` +
           `${bound ? style.good("bound to subscription") : ""}${kind}\n`,
@@ -353,7 +504,9 @@ async function main() {
     });
     stdout.write(`   [n] Create a new tenant\n`);
 
-    const defaultIndex = String(Math.max(1, listed.findIndex((t) => t.tenantId === account.tenantId) + 1));
+    const defaultIndex = String(
+      Math.max(1, listed.findIndex((t) => t.tenantId === account.tenantId) + 1),
+    );
     const choice = await ask("   Directory", defaultIndex);
 
     if (choice.toLowerCase() === "n") {
@@ -375,12 +528,15 @@ async function main() {
     }
 
     const selected = listed[Number(choice) - 1];
-    if (!selected) throw new SetupError(`'${choice}' is not one of the listed directories.`);
+    if (!selected)
+      throw new SetupError(`'${choice}' is not one of the listed directories.`);
     const tenantId = selected.tenantId;
 
     // ----------------------------------------------------- probe permissions
     stdout.write(style.head("4. Checking your permissions"));
-    const roles = graph("https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.directoryRole");
+    const roles = graph(
+      "https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.directoryRole",
+    );
     const held = (roles?.value ?? [])
       .map((role) => ROLE_TEMPLATES[role.roleTemplateId])
       .filter(Boolean);
@@ -397,15 +553,23 @@ async function main() {
         ),
       );
       if (!(await confirm("   Attempt registration anyway?", "y"))) {
-        throw new SetupError("Cancelled. Ask a directory admin to grant Application Administrator.");
+        throw new SetupError(
+          "Cancelled. Ask a directory admin to grant Application Administrator.",
+        );
       }
     }
 
     // ----------------------------------------------------- register the app
     stdout.write(style.head("5. Registering the admin application"));
     const appName = await ask("   Application name", "pawprint-admin");
-    const redirectUri = await ask("   Loopback redirect URI", "http://localhost:7878/auth/callback");
-    const requireAssignment = await confirm("   Require explicit user or group assignment to sign in?", "y");
+    const redirectUri = await ask(
+      "   Loopback redirect URI",
+      "http://localhost:7878/auth/callback",
+    );
+    const requireAssignment = await confirm(
+      "   Require explicit user or group assignment to sign in?",
+      "y",
+    );
 
     const manifest = {
       displayName: appName,
@@ -415,7 +579,10 @@ async function main() {
       tags: [PAWPRINT_TAG, `pawprint-instance:${instanceId}`],
       web: {
         redirectUris: [redirectUri],
-        implicitGrantSettings: { enableIdTokenIssuance: false, enableAccessTokenIssuance: false },
+        implicitGrantSettings: {
+          enableIdTokenIssuance: false,
+          enableAccessTokenIssuance: false,
+        },
       },
       appRoles: APP_ROLES.map((role) => ({
         id: randomUUID(),
@@ -431,30 +598,56 @@ async function main() {
       requiredResourceAccess: [
         {
           resourceAppId: GRAPH_APP_ID,
-          resourceAccess: Object.values(DELEGATED_SCOPES).map((id) => ({ id, type: "Scope" })),
+          resourceAccess: Object.values(DELEGATED_SCOPES).map((id) => ({
+            id,
+            type: "Scope",
+          })),
         },
       ],
     };
 
     if (dryRun) {
-      stdout.write(style.dim(`\n   dry run, not creating:\n${JSON.stringify(manifest, null, 2)}\n`));
+      stdout.write(
+        style.dim(
+          `\n   dry run, not creating:\n${JSON.stringify(manifest, null, 2)}\n`,
+        ),
+      );
       rl.close();
       return;
     }
 
-    const created = graphWrite("post", "https://graph.microsoft.com/v1.0/applications", manifest);
+    const created = graphWrite(
+      "post",
+      "https://graph.microsoft.com/v1.0/applications",
+      manifest,
+    );
     const clientId = created?.appId;
     const appObjectId = created?.id;
-    if (!clientId || !appObjectId) throw new SetupError("Application was created but Graph returned no id.");
-    recordObject({ kind: "application", id: appObjectId, appId: clientId, displayName: appName });
-
-    const servicePrincipal = graphWrite("post", "https://graph.microsoft.com/v1.0/servicePrincipals", {
+    if (!clientId || !appObjectId)
+      throw new SetupError("Application was created but Graph returned no id.");
+    recordObject({
+      kind: "application",
+      id: appObjectId,
       appId: clientId,
-      tags: [PAWPRINT_TAG, `pawprint-instance:${instanceId}`],
-      appRoleAssignmentRequired: requireAssignment,
+      displayName: appName,
     });
+
+    const servicePrincipal = graphWrite(
+      "post",
+      "https://graph.microsoft.com/v1.0/servicePrincipals",
+      {
+        appId: clientId,
+        tags: [PAWPRINT_TAG, `pawprint-instance:${instanceId}`],
+        appRoleAssignmentRequired: requireAssignment,
+      },
+    );
     if (servicePrincipal?.id) {
-      recordObject({ kind: "servicePrincipal", id: servicePrincipal.id, appId: clientId, displayName: appName });
+      recordObject({
+        kind: "servicePrincipal",
+        id: servicePrincipal.id,
+        appId: clientId,
+        displayName: appName,
+      });
     }
 
     stdout.write(
@@ -493,19 +686,36 @@ async function main() {
 
     stdout.write(
       `   ${style.good("ok")}  config/deploy.config.json updated with tenantId, clientId and authority.\n` +
-        style.dim("   These are identifiers, not secrets, and are safe to commit.\n"),
+        style.dim(
+          "   These are identifiers, not secrets, and are safe to commit.\n",
+        ),
     );
 
     writeInstallManifest({ tenantId, operator: account.user?.name });
     stdout.write(
       `   ${style.good("ok")}  Install manifest written to .pawprint-install.json\n` +
-        style.dim(`   ${createdObjects.length} directory object(s) recorded for reversal.\n`),
+        style.dim(
+          `   ${createdObjects.length} directory object(s) recorded for reversal.\n`,
+        ),
     );
 
     // ------------------------------------------------- CI trust and policy
     stdout.write(style.head("7. GitHub Actions trust"));
-    const repository = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
-    if (!repository) {
+    const repository = gh([
+      "repo",
+      "view",
+      "--json",
+      "nameWithOwner",
+      "--jq",
+      ".nameWithOwner",
+    ]);
+    const repositoryMetadataRaw = repository
+      ? gh(["api", `repos/${repository}`])
+      : null;
+    const repositoryMetadata = repositoryMetadataRaw
+      ? JSON.parse(repositoryMetadataRaw)
+      : null;
+    if (!repositoryMetadata) {
       stdout.write(
         style.warn(
           "   GitHub CLI is unavailable or not authenticated, so no federated credential\n" +
@@ -514,14 +724,24 @@ async function main() {
         ),
       );
     } else {
-      const environments = (await ask("   Environments to federate (comma separated)", "dev,prod"))
+      const environments = (
+        await ask("   Environments to federate (comma separated)", "dev,prod")
+      )
         .split(",")
         .map((name) => name.trim())
         .filter(Boolean);
 
       for (const environmentName of environments) {
         const branch = environmentName === "prod" ? "main" : environmentName;
-        federateEnvironment({ appObjectId, repository, environmentName, branch, clientId, tenantId, subscriptionId: account.id });
+        federateEnvironment({
+          appObjectId,
+          repositoryMetadata,
+          environmentName,
+          branch,
+          clientId,
+          tenantId,
+          subscriptionId: account.id,
+        });
       }
       writeInstallManifest({ tenantId, operator: account.user?.name });
     }
@@ -583,7 +803,17 @@ async function configureLocalMode({ ask, dryRun }) {
   // unrecoverable; re-run the wizard to issue a new one.
   writeFileSync(
     resolve(REPO_ROOT, ".pawprint-local-admin.json"),
-    JSON.stringify({ username, salt, hash, algorithm: "scrypt", createdAt: new Date().toISOString() }, null, 2),
+    JSON.stringify(
+      {
+        username,
+        salt,
+        hash,
+        algorithm: "scrypt",
+        createdAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
     { mode: 0o600 },
   );
 
@@ -591,12 +821,16 @@ async function configureLocalMode({ ask, dryRun }) {
     `\n   ${style.good("Credential generated. This is shown once and cannot be recovered.")}\n\n` +
       `      username  ${username}\n` +
       `      password  ${password}\n\n` +
-      style.dim("   Only a salted scrypt hash was stored, in .pawprint-local-admin.json (git-ignored).\n"),
+      style.dim(
+        "   Only a salted scrypt hash was stored, in .pawprint-local-admin.json (git-ignored).\n",
+      ),
   );
 }
 
 function writeConfig(patch) {
-  const existing = existsSync(CONFIG_PATH) ? JSON.parse(readFileSync(CONFIG_PATH, "utf8")) : { configVersion: "1.0.0" };
+  const existing = existsSync(CONFIG_PATH)
+    ? JSON.parse(readFileSync(CONFIG_PATH, "utf8"))
+    : { configVersion: "1.0.0" };
   const merged = {
     ...existing,
     defaults: { ...(existing.defaults ?? {}), ...patch },

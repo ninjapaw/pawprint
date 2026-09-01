@@ -1,0 +1,7 @@
+{
+  "environments": {
+    "dev": {
+      "publicSiteUrl": "https://jolly-desert-067886210.3.azurestaticapps.net/"
+    }
+  }
+}

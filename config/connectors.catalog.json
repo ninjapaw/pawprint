@@ -136,6 +136,64 @@
       }
     },
 
+    "cloudflare": {
+      "title": "Cloudflare DNS",
+      "description": "Verifies and reconciles only the DNS records required to bind an Azure-hosted application to a Cloudflare-managed domain.",
+      "identity": "cloudflare-api-token",
+      "detect": {
+        "method": "cloudflare-api",
+        "probe": "https://api.cloudflare.com/client/v4/user/tokens/verify"
+      },
+      "tiers": {
+        "none": {
+          "summary": "No Cloudflare access. Custom-domain DNS remains manual.",
+          "permissions": [],
+          "consent": "none",
+          "reversible": true
+        },
+        "read": {
+          "summary": "Verify the selected zone and its existing DNS records.",
+          "permissions": [
+            {
+              "name": "Zone Read",
+              "type": "cloudflare-token-permission",
+              "scope": "single-zone",
+              "rationale": "Confirms the configured hostname belongs to the intended Cloudflare zone."
+            },
+            {
+              "name": "DNS Read",
+              "type": "cloudflare-token-permission",
+              "scope": "single-zone",
+              "rationale": "Detects conflicts before any DNS record is changed."
+            }
+          ],
+          "consent": "none",
+          "reversible": true
+        },
+        "write": {
+          "summary": "Additionally reconcile the Azure verification TXT record and application CNAME.",
+          "permissions": [
+            {
+              "name": "DNS Write",
+              "type": "cloudflare-token-permission",
+              "scope": "single-zone",
+              "rationale": "Creates or updates only the two named records required by the custom domain."
+            }
+          ],
+          "consent": "none",
+          "reversible": true,
+          "note": "Use an account-owned service token, store it as a GitHub Environment secret named CLOUDFLARE_API_TOKEN, and restrict its resources to the one zone. Do not use a global API key."
+        },
+        "admin": {
+          "summary": "Intentionally unsupported because custom-domain automation needs no account-wide Cloudflare access.",
+          "permissions": [],
+          "consent": "none",
+          "reversible": true,
+          "note": "Use the write tier. Broader permissions add blast radius without enabling this workflow."
+        }
+      }
+    },
+
     "github": {
       "title": "GitHub",
       "description": "Acts on repositories: reads workflow runs for evidence, opens promotion pull requests, and syncs environment variables from configuration.",

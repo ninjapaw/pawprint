@@ -42,7 +42,10 @@ class ConnectError extends Error {}
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 function azProbe(args) {
-  const result = spawnSync(AZ_BIN, args, { encoding: "utf8", shell: NEEDS_SHELL });
+  const result = spawnSync(AZ_BIN, args, {
+    encoding: "utf8",
+    shell: NEEDS_SHELL,
+  });
   if (result.status !== 0) return null;
   const output = (result.stdout || "").trim();
   if (!output) return null;
@@ -59,10 +62,21 @@ function detect() {
 
   const detected = {
     azure: account
-      ? { present: true, detail: `${account.name} (${account.id})`, subscriptionId: account.id }
+      ? {
+          present: true,
+          detail: `${account.name} (${account.id})`,
+          subscriptionId: account.id,
+        }
       : { present: false, detail: "not signed in to Azure" },
-    microsoft365: { present: false, detail: "requires an Azure or Graph sign-in to probe" },
+    microsoft365: {
+      present: false,
+      detail: "requires an Azure or Graph sign-in to probe",
+    },
     github: { present: false, detail: "no GitHub CLI session" },
+    cloudflare: {
+      present: false,
+      detail: "optional; open http://127.0.0.1:4173/setup/cloudflare/",
+    },
   };
 
   if (account) {
@@ -76,7 +90,9 @@ function detect() {
       "json",
     ])?.value?.[0];
     if (organisation) {
-      const domain = organisation.verifiedDomains?.find((entry) => entry.isDefault)?.name;
+      const domain = organisation.verifiedDomains?.find(
+        (entry) => entry.isDefault,
+      )?.name;
       detected.microsoft365 = {
         present: true,
         detail: `${organisation.displayName}${domain ? ` (${domain})` : ""}`,
@@ -86,13 +102,18 @@ function detect() {
   }
 
   const ghBin = NEEDS_SHELL ? "gh.exe" : "gh";
-  const gh = spawnSync(ghBin, ["auth", "status"], { encoding: "utf8", shell: NEEDS_SHELL });
+  const gh = spawnSync(ghBin, ["auth", "status"], {
+    encoding: "utf8",
+    shell: NEEDS_SHELL,
+  });
   if (gh.status === 0) {
     const combined = `${gh.stdout ?? ""}${gh.stderr ?? ""}`;
     const host = combined.match(/([A-Za-z0-9.-]+)\s*$/m);
     detected.github = {
       present: true,
-      detail: combined.includes("github.com") ? "github.com" : (host?.[1] ?? "authenticated"),
+      detail: combined.includes("github.com")
+        ? "github.com"
+        : (host?.[1] ?? "authenticated"),
     };
   }
 
@@ -112,15 +133,21 @@ function tierAtLeast(actual, required) {
 function reportDetection(catalog, detected) {
   stdout.write(style.head("Detected environments"));
   for (const [key, connector] of Object.entries(catalog.connectors)) {
-    const state = detected[key] ?? { present: false, detail: "no probe available" };
+    const state = detected[key] ?? {
+      present: false,
+      detail: "no probe available",
+    };
     const marker = state.present ? style.good("found") : style.dim("absent");
-    stdout.write(`   ${connector.title.padEnd(26)} ${marker.padEnd(20)} ${state.detail}\n`);
+    stdout.write(
+      `   ${connector.title.padEnd(26)} ${marker.padEnd(20)} ${state.detail}\n`,
+    );
   }
 }
 
 function reportTiers(catalog, connectorKey) {
   const connector = catalog.connectors[connectorKey];
-  if (!connector) throw new ConnectError(`Unknown connector '${connectorKey}'.`);
+  if (!connector)
+    throw new ConnectError(`Unknown connector '${connectorKey}'.`);
 
   stdout.write(style.head(`${connector.title} — permission tiers`));
   stdout.write(style.dim(`   ${connector.description}\n`));
@@ -148,7 +175,9 @@ function reportTiers(catalog, connectorKey) {
             : permission.type;
       const scope = permission.scope ? ` @${permission.scope}` : "";
       stdout.write(`          ${kind}  ${permission.name}${scope}\n`);
-      stdout.write(style.dim(`                      ${permission.rationale}\n`));
+      stdout.write(
+        style.dim(`                      ${permission.rationale}\n`),
+      );
     }
 
     if (tier.note) stdout.write(style.dim(`          note: ${tier.note}\n`));
@@ -163,9 +192,14 @@ function reportCapabilities(catalog, enabled) {
 
   for (const [key, capability] of Object.entries(catalog.capabilities)) {
     const unmet = capability.requires.filter(
-      (requirement) => !tierAtLeast(enabled[requirement.connector], requirement.minTier),
+      (requirement) =>
+        !tierAtLeast(enabled[requirement.connector], requirement.minTier),
     );
-    (unmet.length === 0 ? available : unavailable).push({ key, capability, unmet });
+    (unmet.length === 0 ? available : unavailable).push({
+      key,
+      capability,
+      unmet,
+    });
   }
 
   stdout.write(`\n   ${style.good("Available")} (${available.length})\n`);
@@ -181,7 +215,11 @@ function reportCapabilities(catalog, enabled) {
       .join(", ");
     stdout.write(`      ${entry.key.padEnd(32)} ${entry.capability.title}\n`);
     stdout.write(style.dim(`      ${"".padEnd(32)} needs ${needs}\n`));
-    stdout.write(style.dim(`      ${"".padEnd(32)} without it: ${entry.capability.degraded}\n`));
+    stdout.write(
+      style.dim(
+        `      ${"".padEnd(32)} without it: ${entry.capability.degraded}\n`,
+      ),
+    );
   }
 }
 
@@ -189,9 +227,14 @@ function parsePlan(plan) {
   const tiers = {};
   for (const pair of plan.split(",")) {
     const [connector, tier] = pair.split("=").map((part) => part.trim());
-    if (!connector || !tier) throw new ConnectError(`Malformed plan entry '${pair}'. Use connector=tier.`);
+    if (!connector || !tier)
+      throw new ConnectError(
+        `Malformed plan entry '${pair}'. Use connector=tier.`,
+      );
     if (!TIER_ORDER.includes(tier)) {
-      throw new ConnectError(`Unknown tier '${tier}'. Valid tiers: ${TIER_ORDER.join(", ")}.`);
+      throw new ConnectError(
+        `Unknown tier '${tier}'. Valid tiers: ${TIER_ORDER.join(", ")}.`,
+      );
     }
     tiers[connector] = tier;
   }
@@ -206,14 +249,21 @@ function reportConsentCost(catalog, planned) {
 
   for (const [connectorKey, tierName] of Object.entries(planned)) {
     const connector = catalog.connectors[connectorKey];
-    if (!connector) throw new ConnectError(`Unknown connector '${connectorKey}'.`);
+    if (!connector)
+      throw new ConnectError(`Unknown connector '${connectorKey}'.`);
 
     // Tiers are cumulative, so the cost of a plan is every tier up to the chosen one.
-    for (const candidate of TIER_ORDER.slice(0, TIER_ORDER.indexOf(tierName) + 1)) {
+    for (const candidate of TIER_ORDER.slice(
+      0,
+      TIER_ORDER.indexOf(tierName) + 1,
+    )) {
       const tier = connector.tiers[candidate];
       if (!tier) continue;
-      if (tier.consent === "admin" && tier.permissions.length > 0) adminConsentNeeded = true;
-      applicationPermissions += tier.permissions.filter((p) => p.type === "application").length;
+      if (tier.consent === "admin" && tier.permissions.length > 0)
+        adminConsentNeeded = true;
+      applicationPermissions += tier.permissions.filter(
+        (p) => p.type === "application",
+      ).length;
     }
     stdout.write(`   ${connector.title.padEnd(26)} ${tierName}\n`);
   }
@@ -221,8 +271,12 @@ function reportConsentCost(catalog, planned) {
   stdout.write("\n");
   stdout.write(
     adminConsentNeeded
-      ? style.warn("   A directory administrator must consent for the organisation.\n")
-      : style.good("   No admin consent required. The signed-in user can consent for themselves.\n"),
+      ? style.warn(
+          "   A directory administrator must consent for the organisation.\n",
+        )
+      : style.good(
+          "   No admin consent required. The signed-in user can consent for themselves.\n",
+        ),
   );
 
   if (applicationPermissions > 0) {
@@ -234,7 +288,11 @@ function reportConsentCost(catalog, planned) {
       ),
     );
   } else {
-    stdout.write(style.dim("   All permissions are delegated, so access never exceeds the signed-in user.\n"));
+    stdout.write(
+      style.dim(
+        "   All permissions are delegated, so access never exceeds the signed-in user.\n",
+      ),
+    );
   }
 
   stdout.write(

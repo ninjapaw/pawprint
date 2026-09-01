@@ -29,6 +29,10 @@ const SAMPLE_BINDINGS = [
 /** Shipped configuration that must validate against its schema on every run. */
 const SHIPPED_CONFIG = [
   { file: "config/connectors.catalog.json", schema: "connectors.schema.json" },
+  {
+    file: "config/platform-connectors.catalog.json",
+    schema: "platform-connectors.schema.json",
+  },
   { file: "config/deploy.defaults.json", schema: "deploy.config.schema.json" },
 ];
 
@@ -41,7 +45,9 @@ function main() {
   const compiled = new Map();
   let failures = 0;
 
-  for (const file of readdirSync(SCHEMA_DIR).filter((name) => name.endsWith(".json"))) {
+  for (const file of readdirSync(SCHEMA_DIR).filter((name) =>
+    name.endsWith(".json"),
+  )) {
     try {
       compiled.set(file, ajv.compile(readJson(join(SCHEMA_DIR, file))));
       process.stdout.write(`ok    schema  ${file}\n`);
@@ -55,14 +61,18 @@ function main() {
   try {
     samples = readdirSync(SAMPLE_DIR).filter((name) => name.endsWith(".json"));
   } catch {
-    process.stdout.write("note  no samples/ directory; skipping fixture validation\n");
+    process.stdout.write(
+      "note  no samples/ directory; skipping fixture validation\n",
+    );
   }
 
   for (const { file, schema } of SHIPPED_CONFIG) {
     const validate = compiled.get(schema);
     if (!validate) {
       failures += 1;
-      process.stderr.write(`FAIL  config  ${file}\n      Schema ${schema} did not compile.\n`);
+      process.stderr.write(
+        `FAIL  config  ${file}\n      Schema ${schema} did not compile.\n`,
+      );
       continue;
     }
     if (validate(readJson(join(REPO_ROOT, file)))) {
@@ -72,12 +82,16 @@ function main() {
       const detail = validate.errors
         .map((error) => `      ${error.instancePath || "/"} ${error.message}`)
         .join("\n");
-      process.stderr.write(`FAIL  config  ${file}  against ${schema}\n${detail}\n`);
+      process.stderr.write(
+        `FAIL  config  ${file}  against ${schema}\n${detail}\n`,
+      );
     }
   }
 
   for (const file of samples) {
-    const binding = SAMPLE_BINDINGS.find((candidate) => file.endsWith(candidate.suffix));
+    const binding = SAMPLE_BINDINGS.find((candidate) =>
+      file.endsWith(candidate.suffix),
+    );
     if (!binding) {
       failures += 1;
       process.stderr.write(
@@ -90,7 +104,9 @@ function main() {
     const validate = compiled.get(binding.schema);
     if (!validate) {
       failures += 1;
-      process.stderr.write(`FAIL  sample  ${file}\n      Schema ${binding.schema} did not compile.\n`);
+      process.stderr.write(
+        `FAIL  sample  ${file}\n      Schema ${binding.schema} did not compile.\n`,
+      );
       continue;
     }
 
@@ -101,7 +117,9 @@ function main() {
       const detail = validate.errors
         .map((error) => `      ${error.instancePath || "/"} ${error.message}`)
         .join("\n");
-      process.stderr.write(`FAIL  sample  ${file}  against ${binding.schema}\n${detail}\n`);
+      process.stderr.write(
+        `FAIL  sample  ${file}  against ${binding.schema}\n${detail}\n`,
+      );
     }
   }
 

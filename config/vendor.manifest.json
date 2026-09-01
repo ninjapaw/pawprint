@@ -11,12 +11,20 @@
       "description": "Fails on malformed deployment variables before any Azure call is made."
     },
     {
+      "path": "scripts/connect-cloudflare-dns.sh",
+      "description": "Reconciles the minimal Cloudflare DNS records required by an Azure Static Web App custom domain."
+    },
+    {
       "path": "scripts/audit-secrets.sh",
       "description": "Reports expired, expiring and unexpiring Key Vault secrets."
     },
     {
       "path": "modules/static-site/main.bicep",
       "description": "Static Web App with an optional DNS-validated custom domain."
+    },
+    {
+      "path": "modules/defender-devops-connector/main.bicep",
+      "description": "Defender for Cloud connector shell for GitHub, Azure DevOps, or GitLab."
     },
     {
       "path": "modules/key-vault/main.bicep",

@@ -1,0 +1,403 @@
+{
+  "$schema": "../schema/platform-connectors.schema.json",
+  "catalogVersion": "1.0.0",
+  "connectors": {
+    "defender-github": {
+      "title": "Defender for Cloud / GitHub",
+      "category": "defender",
+      "provider": "github",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "azure-security-connector",
+        "environmentName": "Github"
+      },
+      "permissions": {
+        "read": ["Security Reader", "GitHub organization metadata: read"],
+        "manage": [
+          "Security Admin",
+          "GitHub organization owner for app approval"
+        ]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "disable", "remove"],
+      "iac": {
+        "shared": ["modules/defender-devops-connector/main.bicep"],
+        "repositoryOwned": [
+          "connector name",
+          "hierarchy identifier",
+          "GitHub organization"
+        ]
+      },
+      "guidance": {
+        "summary": "Bicep manages the Azure connector shell; GitHub App authorization requires an organization owner in the browser.",
+        "manualSteps": [
+          "Create or adopt the Bicep connector shell",
+          "Authorize in Defender for Cloud",
+          "Approve the Microsoft Defender for Cloud GitHub App for the intended organization",
+          "Rescan until the devops/default resource exists"
+        ],
+        "url": "https://portal.azure.com/#view/Microsoft_Azure_Security/SecurityMenuBlade/~/environmentSettings"
+      }
+    },
+    "defender-azure-devops": {
+      "title": "Defender for Cloud / Azure DevOps",
+      "category": "defender",
+      "provider": "azure-devops",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "azure-security-connector",
+        "environmentName": "AzureDevOps"
+      },
+      "permissions": {
+        "read": ["Security Reader", "Azure DevOps organization reader"],
+        "manage": [
+          "Security Admin",
+          "Azure DevOps Project Collection Administrator for consent"
+        ]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "disable", "remove"],
+      "iac": {
+        "shared": ["modules/defender-devops-connector/main.bicep"],
+        "repositoryOwned": [
+          "connector name",
+          "hierarchy identifier",
+          "Azure DevOps organization URL"
+        ]
+      },
+      "guidance": {
+        "summary": "Bicep manages the Azure connector shell; Azure DevOps authorization and organization selection remain consent-driven.",
+        "manualSteps": [
+          "Create or adopt the Bicep connector shell",
+          "Authorize the Azure DevOps organization",
+          "Select eligible projects or onboard all eligible projects",
+          "Rescan discovered repositories"
+        ],
+        "url": "https://portal.azure.com/#view/Microsoft_Azure_Security/SecurityMenuBlade/~/environmentSettings"
+      }
+    },
+    "defender-gitlab": {
+      "title": "Defender for Cloud / GitLab",
+      "category": "defender",
+      "provider": "gitlab",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "azure-security-connector",
+        "environmentName": "GitLab"
+      },
+      "permissions": {
+        "read": ["Security Reader", "GitLab group metadata: read"],
+        "manage": ["Security Admin", "GitLab group owner for authorization"]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "rotate", "disable", "remove"],
+      "iac": {
+        "shared": ["modules/defender-devops-connector/main.bicep"],
+        "repositoryOwned": [
+          "connector name",
+          "hierarchy identifier",
+          "GitLab group"
+        ]
+      },
+      "guidance": {
+        "summary": "Bicep manages the Azure connector shell; GitLab authorization remains provider-side.",
+        "manualSteps": [
+          "Create or adopt the Bicep connector shell",
+          "Authorize the GitLab group",
+          "Store any issued credential in the selected secret store",
+          "Rescan discovered projects"
+        ],
+        "url": "https://portal.azure.com/#view/Microsoft_Azure_Security/SecurityMenuBlade/~/environmentSettings"
+      }
+    },
+    "defender-aws": {
+      "title": "Defender for Cloud / AWS",
+      "category": "defender",
+      "provider": "aws",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "azure-security-connector",
+        "environmentName": "AWS"
+      },
+      "permissions": {
+        "read": ["Security Reader", "AWS organization read role"],
+        "manage": [
+          "Security Admin",
+          "AWS permissions to deploy the generated CloudFormation stack"
+        ]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "rotate", "disable", "remove"],
+      "iac": {
+        "shared": ["Microsoft.Security/securityConnectors Bicep contract"],
+        "repositoryOwned": [
+          "AWS account or organization identifiers",
+          "selected Defender plans",
+          "external role identifiers"
+        ]
+      },
+      "guidance": {
+        "summary": "Azure state is Bicep-manageable; the least-privilege AWS trust and generated stack must be accepted in AWS.",
+        "manualSteps": [
+          "Select AWS account or organization scope",
+          "Review requested Defender plans",
+          "Deploy the generated AWS stack",
+          "Verify Azure reports the connector healthy"
+        ],
+        "url": "https://learn.microsoft.com/azure/defender-for-cloud/quickstart-onboard-aws"
+      }
+    },
+    "defender-gcp": {
+      "title": "Defender for Cloud / GCP",
+      "category": "defender",
+      "provider": "gcp",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "azure-security-connector",
+        "environmentName": "GCP"
+      },
+      "permissions": {
+        "read": ["Security Reader", "GCP organization viewer"],
+        "manage": [
+          "Security Admin",
+          "GCP permissions to establish workload identity federation"
+        ]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "rotate", "disable", "remove"],
+      "iac": {
+        "shared": ["Microsoft.Security/securityConnectors Bicep contract"],
+        "repositoryOwned": [
+          "GCP project or organization identifiers",
+          "workload identity provider",
+          "selected Defender plans"
+        ]
+      },
+      "guidance": {
+        "summary": "Azure state is Bicep-manageable; GCP workload identity and project access must be approved in GCP.",
+        "manualSteps": [
+          "Select GCP project or organization scope",
+          "Review requested Defender plans",
+          "Establish workload identity federation",
+          "Verify Azure reports the connector healthy"
+        ],
+        "url": "https://learn.microsoft.com/azure/defender-for-cloud/quickstart-onboard-gcp"
+      }
+    },
+    "entra-github-enterprise-organization": {
+      "title": "Entra gallery / GitHub organization",
+      "category": "identity",
+      "provider": "microsoft-entra",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "graph-service-principal",
+        "displayName": "GitHub Enterprise Cloud - Organization"
+      },
+      "permissions": {
+        "read": ["Directory Readers"],
+        "manage": [
+          "Cloud Application Administrator",
+          "Groups Administrator for group assignment"
+        ]
+      },
+      "lifecycle": [
+        "scan",
+        "onboard",
+        "repair",
+        "rotate",
+        "access",
+        "disable",
+        "remove"
+      ],
+      "iac": {
+        "shared": [
+          "Microsoft Graph application-template instantiation adapter"
+        ],
+        "repositoryOwned": [
+          "GitHub organization",
+          "assignment groups",
+          "SAML mode"
+        ]
+      },
+      "guidance": {
+        "summary": "Graph can instantiate the gallery app and manage group assignments; GitHub SAML validation and recovery-code capture require an organization owner.",
+        "manualSteps": [
+          "Instantiate or adopt the gallery app",
+          "Assign access through Entra groups",
+          "Configure and test SAML in GitHub",
+          "Capture recovery codes before enforcement"
+        ],
+        "url": "https://learn.microsoft.com/entra/identity/saas-apps/github-tutorial"
+      }
+    },
+    "entra-github-enterprise-account": {
+      "title": "Entra gallery / GitHub enterprise account",
+      "category": "identity",
+      "provider": "microsoft-entra",
+      "automation": "hybrid",
+      "detect": {
+        "kind": "graph-service-principal",
+        "displayName": "GitHub Enterprise Cloud - Enterprise Account"
+      },
+      "permissions": {
+        "read": ["Directory Readers"],
+        "manage": [
+          "Cloud Application Administrator",
+          "Groups Administrator for assignment"
+        ]
+      },
+      "lifecycle": [
+        "scan",
+        "onboard",
+        "repair",
+        "rotate",
+        "access",
+        "disable",
+        "remove"
+      ],
+      "iac": {
+        "shared": [
+          "Microsoft Graph application-template instantiation adapter"
+        ],
+        "repositoryOwned": [
+          "GitHub enterprise slug",
+          "assignment groups",
+          "SAML or Enterprise Managed Users mode"
+        ]
+      },
+      "guidance": {
+        "summary": "Graph can instantiate the gallery app; enterprise SAML/SCIM activation and recovery controls require a GitHub enterprise owner.",
+        "manualSteps": [
+          "Choose personal accounts or Enterprise Managed Users before configuration",
+          "Instantiate or adopt the gallery app",
+          "Assign groups without granting enterprise-owner by default",
+          "Test SAML and save recovery codes before enforcement"
+        ],
+        "url": "https://learn.microsoft.com/entra/identity/saas-apps/github-enterprise-cloud-enterprise-account-tutorial"
+      }
+    },
+    "entra-azure-devops": {
+      "title": "Entra / Azure DevOps",
+      "category": "identity",
+      "provider": "microsoft-entra",
+      "automation": "guided",
+      "detect": {
+        "kind": "graph-service-principal",
+        "displayName": "Azure DevOps"
+      },
+      "permissions": {
+        "read": ["Directory Readers", "Azure DevOps organization reader"],
+        "manage": [
+          "Azure DevOps organization owner",
+          "Groups Administrator when group synchronization is used"
+        ]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "disable"],
+      "iac": {
+        "shared": ["read-only Graph and Azure DevOps inventory adapters"],
+        "repositoryOwned": [
+          "organization URL",
+          "Entra tenant binding",
+          "access groups"
+        ]
+      },
+      "guidance": {
+        "summary": "Azure DevOps uses its Microsoft first-party enterprise application; tenant connection and organization ownership are guided rather than replaced with a custom app.",
+        "manualSteps": [
+          "Create or select an Azure DevOps organization",
+          "Connect the organization to the intended Entra tenant",
+          "Use Entra-backed groups for membership",
+          "Keep organization owners to the break-glass minimum"
+        ],
+        "url": "https://learn.microsoft.com/azure/devops/organizations/accounts/connect-organization-to-azure-ad"
+      }
+    },
+    "azure-devops-organization": {
+      "title": "Azure DevOps organization",
+      "category": "devops",
+      "provider": "azure-devops",
+      "automation": "guided",
+      "detect": { "kind": "azure-devops-organization" },
+      "permissions": {
+        "read": ["Organization reader"],
+        "manage": ["Organization owner"]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "disable"],
+      "iac": {
+        "shared": ["organization readiness and tenant-binding checks"],
+        "repositoryOwned": [
+          "organization name",
+          "region",
+          "billing subscription"
+        ]
+      },
+      "guidance": {
+        "summary": "Azure DevOps organization creation is an account-level guided action, not an Azure Resource Manager resource.",
+        "manualSteps": [
+          "Choose a globally unique organization name and region",
+          "Create the organization with the intended owner",
+          "Connect it to Entra",
+          "Replace direct users with Entra groups where supported"
+        ],
+        "url": "https://aex.dev.azure.com/"
+      }
+    },
+    "github-enterprise": {
+      "title": "GitHub Enterprise Cloud",
+      "category": "devops",
+      "provider": "github",
+      "automation": "guided",
+      "detect": { "kind": "github-enterprise" },
+      "permissions": {
+        "read": ["Enterprise viewer or organization member"],
+        "manage": ["Enterprise owner for initial setup"]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "disable"],
+      "iac": {
+        "shared": ["enterprise readiness, SAML, and SCIM checks"],
+        "repositoryOwned": [
+          "enterprise slug",
+          "billing choice",
+          "personal accounts or Enterprise Managed Users"
+        ]
+      },
+      "guidance": {
+        "summary": "GitHub purchase, upgrade, billing, and initial enterprise creation require an owner in GitHub; later policy can be audited and managed through APIs where supported.",
+        "manualSteps": [
+          "Choose Enterprise Managed Users before creation if required",
+          "Start a trial or upgrade the organization",
+          "Configure Entra SSO using the matching gallery app",
+          "Save recovery codes and test before enforcing SSO"
+        ],
+        "url": "https://github.com/settings/enterprises"
+      }
+    },
+    "cloudflare-dns": {
+      "title": "Cloudflare DNS",
+      "category": "dns",
+      "provider": "cloudflare",
+      "automation": "hybrid",
+      "detect": { "kind": "github-environment-secret" },
+      "permissions": {
+        "read": ["Zone Read", "DNS Read"],
+        "manage": ["DNS Write on one zone"]
+      },
+      "lifecycle": ["scan", "onboard", "repair", "rotate", "disable", "remove"],
+      "iac": {
+        "shared": [
+          "modules/static-site/main.bicep",
+          "scripts/connect-cloudflare-dns.sh"
+        ],
+        "repositoryOwned": [
+          "zone name",
+          "custom hostname",
+          "GitHub Environment secret"
+        ]
+      },
+      "guidance": {
+        "summary": "Azure remains Bicep-managed; Cloudflare receives only the validation TXT and DNS-only CNAME records.",
+        "manualSteps": [
+          "Create a zone-scoped account token",
+          "Verify and store it through the loopback portal",
+          "Deploy the custom-domain workflow"
+        ],
+        "url": "http://127.0.0.1:4173/setup/cloudflare/"
+      }
+    }
+  }
+}

@@ -38,14 +38,17 @@
         "identity": {
           "description": "Which identity system governs this connector.",
           "type": "string",
-          "enum": ["entra", "github", "azure-rbac"]
+          "enum": ["entra", "github", "azure-rbac", "cloudflare-api-token"]
         },
         "detect": {
           "description": "How the wizard detects whether this environment is present, before asking for anything.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "method": { "type": "string", "enum": ["graph", "arm", "github-api", "none"] },
+            "method": {
+              "type": "string",
+              "enum": ["graph", "arm", "github-api", "cloudflare-api", "none"]
+            },
             "probe": {
               "description": "Read-only probe. Must never require a permission beyond what sign-in already grants.",
               "type": "string"
@@ -98,12 +101,26 @@
         "type": {
           "description": "delegated: acts as the signed-in user and can never exceed their access. application: standing access independent of any user, and therefore a larger grant.",
           "type": "string",
-          "enum": ["delegated", "application", "azure-role", "github-permission"]
+          "enum": [
+            "delegated",
+            "application",
+            "azure-role",
+            "github-permission",
+            "cloudflare-token-permission"
+          ]
         },
         "scope": {
           "description": "For azure-role, the narrowest scope the role is assigned at.",
           "type": "string",
-          "enum": ["resource-group", "subscription", "management-group", "tenant", "repository", "organization"]
+          "enum": [
+            "resource-group",
+            "subscription",
+            "management-group",
+            "tenant",
+            "repository",
+            "organization",
+            "single-zone"
+          ]
         },
         "rationale": {
           "description": "Why this permission is needed. A permission without a stated reason does not belong in the catalog.",
@@ -128,7 +145,10 @@
             "additionalProperties": false,
             "properties": {
               "connector": { "type": "string" },
-              "minTier": { "type": "string", "enum": ["none", "read", "write", "admin"] }
+              "minTier": {
+                "type": "string",
+                "enum": ["none", "read", "write", "admin"]
+              }
             }
           }
         },

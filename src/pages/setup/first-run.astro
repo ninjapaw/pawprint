@@ -1,0 +1,117 @@
+---
+import "../../styles/portal.css";
+import { ArrowLeft, BadgeDollarSign, MapPin, Save, Sparkles } from "@lucide/astro";
+import Disclaimer from "../../components/Disclaimer.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Plan the first PawPrint platform deployment." />
+    <meta name="theme-color" content="#101820" />
+    <title>First-run setup | PawPrint Portal</title>
+  </head>
+  <body class="connector-body">
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Return to PawPrint Portal"><img src="/pawprint-mark.svg" alt="" width="36" height="36" /><span>Paw<strong>Print</strong> Portal</span></a>
+      <span class="connector-optional">First deployment</span>
+      <a class="auth-link" href="/"><ArrowLeft aria-hidden="true" size={16} /> Back</a>
+    </header>
+
+    <main class="wizard-main">
+      <div class="wizard-heading">
+        <p class="eyebrow">CAF-aligned platform planning</p>
+        <h1>Set the defaults once.</h1>
+        <p>Workloads can override subscription and region later when your permissions allow it. This plan establishes shared management defaults without locking every deployment to them.</p>
+      </div>
+
+      <nav class="wizard-progress" aria-label="Setup progress" data-wizard-progress></nav>
+
+      <form data-first-run-form>
+        <section class="wizard-step" data-step="0">
+          <p class="eyebrow">1 / Platform scope</p>
+          <h2>Which environments should exist?</h2>
+          <p class="step-explanation">Development and production are the recommended starting pair. Add QA or test only when they have a distinct validation or isolation purpose.</p>
+          <div class="choice-grid environment-choices">
+            <label><input type="checkbox" name="environment" value="dev" checked /><strong>Development</strong><span>Fast iteration and integration validation.</span></label>
+            <label><input type="checkbox" name="environment" value="prod" checked /><strong>Production</strong><span>Protected, approved customer-facing state.</span></label>
+            <label><input type="checkbox" name="environment" value="qa" /><strong>QA</strong><span>Independent acceptance and release validation.</span></label>
+            <label><input type="checkbox" name="environment" value="test" /><strong>Testing</strong><span>Automated or destructive test isolation.</span></label>
+          </div>
+        </section>
+
+        <section class="wizard-step" data-step="1" hidden>
+          <p class="eyebrow">2 / Subscription strategy</p>
+          <h2>Where should shared management live?</h2>
+          <p class="step-explanation">Choose one default subscription for shared management. Override individual environments below only for isolation, billing, policy, or quota reasons.</p>
+          <label class="field-label">Default management subscription<select name="managementSubscriptionId" data-subscription-select required></select></label>
+          <div class="cost-panel" data-cost-panel><BadgeDollarSign aria-hidden="true" size={23} /><div><strong>Loading cost context</strong><span>Month-to-date actual cost and monthly budget.</span></div></div>
+          <div class="override-list" data-environment-overrides></div>
+        </section>
+
+        <section class="wizard-step" data-step="2" hidden>
+          <p class="eyebrow">3 / Azure regions</p>
+          <h2>Choose the deployment home.</h2>
+          <p class="step-explanation">Use one default physical region to reduce latency, egress, and operational variance. Per-environment overrides remain available for compliance, capacity, or resilience.</p>
+          <label class="field-label"><MapPin aria-hidden="true" size={16} /> Default Azure region<select name="defaultLocation" data-location-select required></select></label>
+          <div class="location-overrides" data-location-overrides></div>
+        </section>
+
+        <section class="wizard-step" data-step="3" hidden>
+          <p class="eyebrow">4 / Naming standard</p>
+          <h2>Generate one reusable convention.</h2>
+          <p class="step-explanation">CAF names use resource type, workload, environment, region, and instance components. The assistant is deterministic so regenerated names do not cause deployment drift.</p>
+          <div class="naming-fields">
+            <label>Organization name<input name="organizationName" value="Ninja Paws" required /></label>
+            <label>Organization prefix<input name="organizationPrefix" value="NP" maxlength="6" required /></label>
+            <label>Platform/workload name<input name="platformName" value="PawPrint Platform" required /></label>
+          </div>
+          <label class="field-label">Naming assistant prompt<textarea name="namingPrompt" rows="3">Create concise Azure names for a shared security deployment platform. Preserve NP as the organization prefix, include environment and region, use CAF resource abbreviations, and add a stable instance suffix only where global uniqueness is required.</textarea></label>
+          <button type="button" class="generate-button" data-generate-names><Sparkles aria-hidden="true" size={17} /> Regenerate names</button>
+          <div class="name-preview" data-name-preview></div>
+        </section>
+
+        <section class="wizard-step" data-step="4" hidden>
+          <p class="eyebrow">5 / Governance and connectors</p>
+          <h2>Set safety defaults.</h2>
+          <p class="step-explanation">Connector selections are intent, not blanket consent. The platform inventory still previews permissions and requires provider authorization where APIs cannot complete it.</p>
+          <div class="choice-grid connector-choices">
+            <label><input type="checkbox" name="connector" value="defender-github" checked /><strong>Defender + GitHub</strong><span>Bicep shell plus organization authorization.</span></label>
+            <label><input type="checkbox" name="connector" value="defender-azure-devops" /><strong>Defender + Azure DevOps</strong><span>Bicep shell plus organization consent.</span></label>
+            <label><input type="checkbox" name="connector" value="entra-github-enterprise-account" /><strong>GitHub Enterprise + Entra</strong><span>Gallery app, SSO, optional SCIM.</span></label>
+            <label><input type="checkbox" name="connector" value="cloudflare-dns" /><strong>Cloudflare DNS</strong><span>Optional custom-domain verification.</span></label>
+          </div>
+          <div class="tag-fields">
+            <label>Owner tag<input name="tagOwner" value="ninjapaw" required /></label>
+            <label>Cost center tag<input name="tagCostCenter" placeholder="security-platform" /></label>
+            <label>Data classification<input name="tagClassification" value="internal" /></label>
+          </div>
+          <label class="danger-choice"><input type="checkbox" name="allowRecreate" /><span><strong>Allow delete and re-create when required</strong><small>Default is off. Enabling records consent in the plan; every destructive operation still requires its own preview and confirmation.</small></span></label>
+        </section>
+
+        <section class="wizard-step" data-step="5" hidden>
+          <p class="eyebrow">6 / Review</p>
+          <h2>Review the platform plan.</h2>
+          <p class="step-explanation">Saving writes only a git-ignored local plan. It does not deploy, grant consent, delete resources, or store credentials.</p>
+          <div class="plan-review" data-plan-review></div>
+          <button type="submit" class="save-plan"><Save aria-hidden="true" size={17} /> Save local setup plan</button>
+          <p class="wizard-message" data-wizard-message aria-live="polite"></p>
+        </section>
+
+        <div class="wizard-navigation">
+          <button type="button" data-wizard-back disabled>Back</button>
+          <button type="button" data-wizard-next>Continue</button>
+        </div>
+      </form>
+
+      <section class="roadmap-band" aria-labelledby="roadmap-title">
+        <p class="eyebrow">Roadmap</p><h2 id="roadmap-title">Governance after first run</h2>
+        <p>Management-group topology, Azure Policy initiatives, PIM activation workflows, cost anomaly alerts, chargeback allocation, multi-region recovery, naming-policy enforcement, and automated access reviews belong after the baseline is proven. Management groups are intentionally not managed in this release.</p>
+      </section>
+    </main>
+    <script is:inline src="/first-run-setup.js"></script>
+  </body>
+</html>

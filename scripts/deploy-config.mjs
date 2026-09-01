@@ -77,7 +77,8 @@ for (const [name, key] of Object.entries({
   ...BASE_ENV,
   ...(resolver.env ?? {}),
 })) {
-  const value = key === "__environmentName" ? environmentName : settings[key];
+  const value =
+    key === "__environmentName" ? environmentName : getPath(settings, key);
   const resolved = value === undefined || value === null ? "" : String(value);
   const override = overridable.has(name)
     ? (process.env[name] ?? "").trim()
@@ -95,6 +96,12 @@ if (values["github-output"]) {
 }
 if (!values["github-env"] && !values["github-output"] && !values.check) {
   process.stdout.write(`${lines.join("\n")}\n`);
+}
+
+function getPath(root, path) {
+  return String(path)
+    .split(".")
+    .reduce((value, segment) => value?.[segment], root);
 }
 
 function appendTo(variableName, content) {

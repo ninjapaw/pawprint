@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { githubEnvironmentSubject } from "./github-oidc-subject.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = join(REPO_ROOT, "config", "platform.json");
@@ -203,7 +204,7 @@ if (environment.hostsDevOpsConnector) {
 
 for (const [name, repository] of Object.entries(manifest.repositories ?? {})) {
   const declared = repository.environments?.[environmentName];
-  if (repository.role === "kit" || !declared) {
+  if (!declared) {
     continue;
   }
 
@@ -337,7 +338,17 @@ function checkApplication(
       "json",
     ]) ?? "[]",
   );
-  const expected = `repo:${organisation}/${repositoryName}:environment:${environmentName}`;
+  const repositoryMetadata = ghJson(`repos/${organisation}/${repositoryName}`);
+  if (!repositoryMetadata) {
+    gap(
+      `cannot resolve immutable GitHub IDs for ${organisation}/${repositoryName}`,
+    );
+    return;
+  }
+  const expected = githubEnvironmentSubject(
+    repositoryMetadata,
+    environmentName,
+  );
   const match = credentials.find(
     (credential) => credential.subject === expected,
   );

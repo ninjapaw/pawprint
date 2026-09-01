@@ -1,0 +1,135 @@
+name: Deploy Pawprint Portal API
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/deploy-portal-api.yml
+      - api/**
+      - infra/portal/**
+  workflow_dispatch:
+    inputs:
+      deploy-infrastructure:
+        description: Apply the reviewed portal Bicep before publishing API code
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pawprint-portal-api-dev
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+        working-directory: api
+      - run: npm run typecheck
+        working-directory: api
+      - run: npm test
+        working-directory: api
+      - run: npm run build
+        working-directory: api
+      - name: Compile infrastructure
+        run: |
+          az bicep build --file infra/portal/main.bicep --outfile "$RUNNER_TEMP/portal.json"
+          az bicep build-params --file infra/portal/main.dev.bicepparam --outfile "$RUNNER_TEMP/portal.parameters.json"
+      - name: Package Function App
+        working-directory: api
+        run: |
+          npm prune --omit=dev
+          zip -r "$RUNNER_TEMP/pawprint-portal-api.zip" dist host.json node_modules package.json package-lock.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pawprint-portal-api
+          path: ${{ runner.temp }}/pawprint-portal-api.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pawprint-portal-api
+          path: function-package
+      - name: Sign in for infrastructure deployment
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy infrastructure
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+        env:
+          GITHUB_APP_ENABLED: ${{ vars.PAWPRINT_GITHUB_APP_ENABLED }}
+          GITHUB_APP_ID: ${{ vars.PAWPRINT_GITHUB_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ vars.PAWPRINT_GITHUB_APP_INSTALLATION_ID }}
+        run: |
+          [[ "${GITHUB_APP_ENABLED:-false}" =~ ^(true|false)$ ]]
+          if [[ "${GITHUB_APP_ENABLED:-false}" == true ]]; then
+            [[ "$GITHUB_APP_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$GITHUB_APP_INSTALLATION_ID" =~ ^[1-9][0-9]*$ ]]
+          fi
+          az deployment group create \
+            --name "pawprint-portal-${GITHUB_RUN_NUMBER}" \
+            --resource-group NP-Platform-Dev-CentralUS \
+            --template-file infra/portal/main.bicep \
+            --parameters infra/portal/main.dev.bicepparam \
+            --parameters \
+              githubAppEnabled="${GITHUB_APP_ENABLED:-false}" \
+              githubAppId="${GITHUB_APP_ID:-}" \
+              githubAppInstallationId="${GITHUB_APP_INSTALLATION_ID:-}"
+
+      - name: Sign out infrastructure identity
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+        run: az logout
+
+      - name: Sign in for Function publication
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_API_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy Function App with One Deploy
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group NP-Platform-Dev-CentralUS \
+            --name np-pawprint-api-dev-centralus \
+            --src function-package/pawprint-portal-api.zip \
+            --output none
+
+      - name: Verify linked API and direct-host isolation
+        run: |
+          linked_status="$(curl --silent --show-error --output "$RUNNER_TEMP/health.json" --write-out '%{http_code}' \
+            https://jolly-desert-067886210.3.azurestaticapps.net/api/health)"
+          test "$linked_status" = 200
+          jq -e '.status == "ok"' "$RUNNER_TEMP/health.json" >/dev/null
+
+          forged_principal="$(printf '%s' '{"identityProvider":"github","userId":"forged","userDetails":"forged","userRoles":["admin"]}' | base64 --wrap=0)"
+          direct_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --header "x-ms-client-principal: $forged_principal" \
+            https://np-pawprint-api-dev-centralus.azurewebsites.net/api/admin/status)"
+          if [[ "$direct_status" = 200 || "$direct_status" = 202 ]]; then
+            echo "::error title=Direct Function isolation failed::A forged SWA principal reached the Function host."
+            exit 1
+          fi

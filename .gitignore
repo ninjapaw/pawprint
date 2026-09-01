@@ -20,6 +20,9 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+.astro/
+playwright-report/
+test-results/
 
 # Local run artifacts. Pawprints may contain subscription, tenant, resource and
 # operator identifiers. Never commit an unredacted pawprint.
@@ -43,6 +46,7 @@ output/
 .pawprint-install.json
 .pawprint-onboard.json
 .pawprint-graph-body.json
+.pawprint-setup-plan.json
 
 # Adopter-owned configuration override, which carries environment-specific names
 config/deploy.config.json

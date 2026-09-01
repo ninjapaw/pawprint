@@ -23,7 +23,14 @@
   "repositories": {
     "pawprint": {
       "role": "kit",
-      "environments": {}
+      "environments": {
+        "dev": {
+          "resourceGroup": "NP-Platform-Dev-CentralUS",
+          "infrastructureApp": "pawprint-dev-infrastructure-github",
+          "apiApp": "pawprint-dev-api-github",
+          "rbacAdmin": true
+        }
+      }
     },
     "site": {
       "role": "workload",

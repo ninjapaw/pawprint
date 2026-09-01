@@ -13,6 +13,14 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "portal": "node scripts/pawprint-portal.mjs",
+    "portal:dev": "astro dev --host 127.0.0.1",
+    "portal:build": "astro build",
+    "portal:check": "astro check",
+    "portal:test": "node --check scripts/pawprint-portal.mjs && node --check public/portal.js && npm run portal:check && npm run portal:build",
+    "portal:test:e2e": "playwright test",
+    "api:build": "npm --prefix api run build",
+    "api:test": "npm --prefix api run typecheck && npm --prefix api test",
     "setup": "node scripts/pawprint-setup.mjs",
     "doctor": "node scripts/pawprint-doctor.mjs",
     "connect": "node scripts/pawprint-connect.mjs",
@@ -23,14 +31,25 @@
     "test:guardrails": "node scripts/test-guardrails.mjs",
     "test:policy": "node scripts/test-scenario-policy.mjs",
     "test:deploy-config": "node scripts/test-deploy-config.mjs",
+    "test:oidc-subject": "node scripts/test-github-oidc-subject.mjs",
+    "test:github-app-setup": "node scripts/test-github-app-setup.mjs",
+    "test:identity-scripts": "node --check scripts/pawprint-setup.mjs && node --check scripts/pawprint-onboard.mjs && node --check scripts/pawprint-platform.mjs",
     "vendor:sync": "node scripts/vendor-sync.mjs",
     "vendor:check": "node scripts/vendor-sync.mjs --verify-sources",
     "connector:check": "node scripts/check-devops-connector.mjs",
     "platform:status": "node scripts/pawprint-platform.mjs",
     "onboard": "node scripts/pawprint-onboard.mjs",
-    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config && npm run vendor:check"
+    "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config && npm run test:oidc-subject && npm run test:github-app-setup && npm run test:identity-scripts && npm run vendor:check && npm run portal:test && npm run api:test"
+  },
+  "dependencies": {
+    "@lucide/astro": "1.38.0",
+    "@octokit/auth-app": "^8.1.2",
+    "astro": "^7.1.1"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@playwright/test": "^1.62.1",
+    "typescript": "^5.7.3",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
   },

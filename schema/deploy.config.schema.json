@@ -89,7 +89,26 @@
       "properties": {
         "microsoft365": { "$ref": "#/$defs/tierChoice" },
         "azure": { "$ref": "#/$defs/tierChoice" },
-        "github": { "$ref": "#/$defs/tierChoice" }
+        "github": { "$ref": "#/$defs/tierChoice" },
+        "cloudflare": { "$ref": "#/$defs/tierChoice" }
+      }
+    },
+
+    "dns": {
+      "description": "Optional external DNS authority used only to verify and route a custom domain. Credentials are runtime secrets and never belong here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "zoneName"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["cloudflare"]
+        },
+        "zoneName": {
+          "description": "Authoritative Cloudflare DNS zone, for example example.com.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9.-]+$"
+        }
       }
     },
 
@@ -372,6 +391,7 @@
         "sinks": { "$ref": "#/$defs/sinks" },
         "admin": { "$ref": "#/$defs/admin" },
         "connectors": { "$ref": "#/$defs/connectors" },
+        "dns": { "$ref": "#/$defs/dns" },
         "secrets": { "$ref": "#/$defs/secrets" },
         "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }
@@ -412,6 +432,7 @@
         "sinks": { "$ref": "#/$defs/sinks" },
         "admin": { "$ref": "#/$defs/admin" },
         "connectors": { "$ref": "#/$defs/connectors" },
+        "dns": { "$ref": "#/$defs/dns" },
         "secrets": { "$ref": "#/$defs/secrets" },
         "approvedSubscriptions": { "$ref": "#/$defs/approvedSubscriptions" }
       }

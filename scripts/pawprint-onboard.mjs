@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { githubEnvironmentSubject } from "./github-oidc-subject.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST_PATH = join(REPO_ROOT, ".pawprint-onboard.json");
@@ -79,6 +80,14 @@ for (const [name, shape] of Object.entries(SHAPES)) {
     fail(`--${name} value '${values[name]}' is not a valid ${name}.`);
   }
 }
+for (const name of ["infrastructure-app", "api-app"]) {
+  if (
+    values[name] &&
+    !/^[A-Za-z0-9][A-Za-z0-9._ -]{0,119}$/.test(values[name])
+  ) {
+    fail(`--${name} value '${values[name]}' is not a safe application name.`);
+  }
+}
 for (const reviewer of values["required-reviewer"]) {
   if (!/^\d+$/.test(reviewer)) {
     fail(
@@ -94,6 +103,7 @@ const resourceGroup = values["resource-group"];
 const slug = repository.split("/")[1];
 const scope = `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}`;
 const dryRun = !values.apply;
+let federatedSubject;
 
 const created = [];
 
@@ -178,6 +188,15 @@ if (
   fail(`Repository ${repository} is not accessible.`);
 }
 
+const repositoryMetadata = ghJson(`repos/${repository}`);
+if (!repositoryMetadata) {
+  fail(`Unable to resolve GitHub repository IDs for '${repository}'.`);
+}
+federatedSubject = githubEnvironmentSubject(
+  repositoryMetadata,
+  environmentName,
+);
+
 const tenantId = az([
   "account",
   "show",
@@ -219,7 +238,7 @@ step(
   `bind environment '${environmentName}' to branch '${branch}'` +
     (reviewers.length ? ` with ${reviewers.length} required reviewer(s)` : ""),
   () => {
-    ghJson(
+    ghJsonRequired(
       `repos/${repository}/environments/${environmentName}`,
       "PUT",
       environmentBody,
@@ -231,12 +250,23 @@ step(
       (policy) => policy.name === branch,
     );
     if (!already) {
-      ghJson(
+      ghJsonRequired(
         `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
         "POST",
         {
           name: branch,
         },
+      );
+    }
+    const configured = ghJsonRequired(
+      `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+    );
+    const branches = (configured.branch_policies ?? []).map(
+      (policy) => policy.name,
+    );
+    if (!branches.includes(branch)) {
+      fail(
+        `GitHub environment '${environmentName}' is not bound to '${branch}' after configuration.`,
       );
     }
   },
@@ -321,6 +351,25 @@ function ghJson(path, method = "GET", body) {
     return output.trim() ? JSON.parse(output) : null;
   } catch {
     return null;
+  }
+}
+
+function ghJsonRequired(path, method = "GET", body) {
+  const args = ["api", path];
+  if (method !== "GET") {
+    args.push("-X", method, "--input", "-");
+  }
+  try {
+    const output = execFileSync(binary("gh"), args, {
+      encoding: "utf8",
+      input: body ? JSON.stringify(body) : undefined,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return output.trim() ? JSON.parse(output) : {};
+  } catch (error) {
+    fail(
+      `GitHub ${method} ${path} failed: ${error.stderr?.trim() ?? error.message}`,
+    );
   }
 }
 
@@ -475,7 +524,7 @@ function credentialFile(payload) {
 }
 
 function ensureFederatedCredential(application, name) {
-  const subject = `repo:${repository}:environment:${environmentName}`;
+  const subject = federatedSubject;
 
   if (application.objectId !== "<new>") {
     const existing = az(

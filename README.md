@@ -39,6 +39,44 @@ npm test
 npm run doctor
 ```
 
+### Deployment portal
+
+On Windows, double-click [PawPrint Portal.cmd](PawPrint%20Portal.cmd). It checks
+the local prerequisites and signed-in Azure and GitHub CLI sessions, builds the
+Astro interface, opens `http://127.0.0.1:4173`, and enables the allowlisted dev
+deployment actions.
+
+The hosted portal is available at
+<https://jolly-desert-067886210.3.azurestaticapps.net/>. The entire hosted UI is
+restricted to users holding its provider-specific invitation-assigned `admin`
+role. Microsoft Entra is recommended for workforce access, while GitHub supports
+the invited operator account that administers `ninjapaw`. Hosted controls additionally require
+a dedicated GitHub App configured in the portal Function App. Until both are
+ready, hosted dispatch remains disabled.
+The local loopback controller continues to use the operator's existing CLI
+sessions; Azure or GitHub credentials are never embedded in the static build.
+
+```bash
+npm run portal:build
+npm run portal
+```
+
+`Deploy all development workloads` starts each repository independently. Within
+each repository, infrastructure must succeed before its application workflow is
+dispatched. The controller accepts only the actions declared in
+`config/portal.json`; it does not expose a general-purpose shell endpoint.
+
+Portal infrastructure is declared in `infra/portal/main.bicep`. The dev publish
+workflow uses the `dev` GitHub Environment and its
+`AZURE_STATIC_WEB_APPS_API_TOKEN` secret.
+
+The API workflow uses Azure Functions One Deploy. Flex Consumption needs network
+access to its deployment and runtime storage, and this resource group has no
+private network path. The storage account therefore uses the management policy's
+explicit `SecurityControl=Ignore` exception. Its endpoint is reachable, but all
+data remains Entra-RBAC protected: shared-key access and anonymous blob access
+are disabled. A future VNet/private-endpoint deployment can remove this exception.
+
 For first-time setup:
 
 ```bash
@@ -83,7 +121,7 @@ Pawprint has three separate planes:
 | ------------------------- | ------------------------------------------------------------------- |
 | Viewer                    | Static/client-side and unauthenticated; stores nothing              |
 | Local setup/admin console | Loopback-only, using workforce Entra or a local fallback credential |
-| Hosted team console       | Internal deployment protected by workforce Entra app roles          |
+| Hosted team console       | Entra or GitHub sign-in with provider-specific invited roles        |
 
 Use the existing workforce Entra tenant so Conditional Access, MFA, Identity
 Protection, PIM, audit retention, and group-based access remain in one place.
@@ -94,6 +132,48 @@ Assign app roles to groups where possible:
 | `Pawprint.Admin`    | Configure identity, sinks, environments, and destructive operations |
 | `Pawprint.Operator` | Deploy, remediate, verify, and destroy runs                         |
 | `Pawprint.Reader`   | View pawprints and configuration                                    |
+
+The current portal uses Static Web Apps Microsoft Entra authentication and a
+time-limited invitation for its lowercase `admin` route role. Invite workforce
+accounts such as `bill.mcilhargey@ninjapaws.org`; external operators can be
+managed as B2B guests in the same workforce tenant and invited by email. Remove
+an accepted portal user with `az staticwebapp users delete` or update its roles
+when access is no longer required.
+
+Hosted deployment remains disabled until a dedicated GitHub App is installed on
+only the four workload repositories. Grant that App `Metadata: read` and
+`Actions: write`; store its private key as `github-app-private-key` in the portal
+Key Vault, then set the App and installation IDs in Bicep before enabling
+`githubAppEnabled`. To stop hosted dispatch immediately, set
+`GITHUB_APP_ENABLED=false` on the Function App or uninstall the GitHub App.
+
+The local portal automates this setup with GitHub's App Manifest flow. Open
+`http://127.0.0.1:4173`, review **GitHub App setup**, then select **Create and
+install App**. GitHub still requires an organization owner or GitHub App manager
+to approve creation and choose repositories. Select exactly:
+
+- `ninjapaw/m365profiles`
+- `ninjapaw/site`
+- `ninjapaw/sentinel-optimizer`
+- `ninjapaw/ninjapaws-cloud-security-dojo`
+
+The generated App is private, has no webhook or user OAuth flow, and requests
+only `Actions: write` plus GitHub's mandatory `Metadata: read`. Pawprint audits
+the complete App and installation before enabling it; extra permissions or
+repositories fail validation.
+
+| Value                                        | Destination                                      |
+| -------------------------------------------- | ------------------------------------------------ |
+| GitHub App private key                       | `github-app-private-key` in `np-pawprint-dev-kv` |
+| App ID, slug, installation ID, enabled state | Pawprint `dev` GitHub Environment variables      |
+| Static Web Apps deployment token             | Pawprint `dev` GitHub Environment secret         |
+| Azure and GitHub operator credentials        | Existing local CLI sessions; never copied        |
+
+If the browser flow or local process is interrupted, reopen the portal and use
+**Audit and enable**. Temporary Key Vault elevation uses a deterministic role
+assignment, is removed and verified after use, and is recovered before the
+portal starts. **Disable hosted dispatch** turns off the Function setting first
+and then records the disabled GitHub desired state.
 
 GitHub repository actions are separate from human sign-in. Prefer a GitHub App
 for repository automation. If using reusable workflows, pin an immutable
@@ -167,6 +247,7 @@ unlocks the capability you need:
 ```bash
 npm run connect
 node scripts/pawprint-connect.mjs --plan microsoft365=read,azure=write
+node scripts/pawprint-connect.mjs --connector cloudflare
 ```
 
 The planner previews consent and capabilities without requesting permissions.
@@ -206,14 +287,36 @@ live, so a change to a convention is made once rather than in every repository.
 | `kit-scenario-validate.yml`  | Scenario manifest schema and policy                                            |
 | `kit-reap-expired.yml`       | Teardown of runs past their `pawprint.expiresAt` tag                           |
 
-| Shared module                   | Deploys                                                       |
-| ------------------------------- | ------------------------------------------------------------- |
-| `modules/static-site`           | Static Web App with optional DNS-validated custom domain      |
-| `modules/key-vault`             | RBAC-authorised vault with audit logging, both secret tiers   |
-| `modules/container-app-service` | Linux container on App Service with managed-identity ACR pull |
-| `modules/evidence-store`        | Write-once blob storage for pawprints                         |
-| `modules/monitoring`            | Log Analytics and Application Insights for an ephemeral run   |
-| `modules/naming`                | The resource naming convention                                |
+| Shared module                       | Deploys                                                       |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `modules/static-site`               | Static Web App with optional DNS-validated custom domain      |
+| `modules/defender-devops-connector` | Defender connector shell for GitHub, Azure DevOps, or GitLab  |
+| `modules/key-vault`                 | RBAC-authorised vault with audit logging, both secret tiers   |
+| `modules/container-app-service`     | Linux container on App Service with managed-identity ACR pull |
+| `modules/evidence-store`            | Write-once blob storage for pawprints                         |
+| `modules/monitoring`                | Log Analytics and Application Insights for an ephemeral run   |
+| `modules/naming`                    | The resource naming convention                                |
+
+`scripts/connect-cloudflare-dns.sh` is the matching external-DNS connector. It
+reconciles only the Azure verification TXT record and application CNAME, using
+an account-owned Cloudflare service token restricted to one zone and supplied
+at runtime. Azure continues to own the application and managed certificate; no
+Cloudflare account or proxy features are provisioned.
+See [External DNS ownership](docs/external-dns.md) for the Bicep boundary,
+provider extension contract, fork behavior, and guided setup flow. Run
+`npm run portal`, then open `http://127.0.0.1:4173/setup/cloudflare/` to connect
+the optional Cloudflare provider without passing its token through a shell.
+
+The local portal also exposes `http://127.0.0.1:4173/setup/platform/` for a
+read-only-first inventory of Defender for Cloud, Entra gallery, GitHub
+Enterprise, Azure DevOps, GitLab, AWS, GCP, and DNS connections. See
+[Platform connector management](docs/platform-connectors.md) for lifecycle and
+permission boundaries.
+
+For a first deployment, open `http://127.0.0.1:4173/setup/first-run/`. The
+wizard establishes environment, subscription, region, CAF naming, tag,
+connector, budget-awareness, and destructive-operation defaults before any IaC
+is applied. Details are in [First-run planning](docs/first-run.md).
 
 Bicep has no module registry here, so shared modules and scripts are vendored
 into consumers under `vendor/pawprint/` with paths mirroring this repository.
