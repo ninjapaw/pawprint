@@ -36,8 +36,13 @@ if (!values.subscription) {
 if (!/^[0-9a-fA-F-]{36}$/.test(values.subscription)) {
   fail(`--subscription '${values.subscription}' is not a subscription id.`);
 }
-if (values["github-org"] && !/^[A-Za-z0-9-]{1,39}$/.test(values["github-org"])) {
-  fail(`--github-org '${values["github-org"]}' is not a GitHub organisation name.`);
+if (
+  values["github-org"] &&
+  !/^[A-Za-z0-9-]{1,39}$/.test(values["github-org"])
+) {
+  fail(
+    `--github-org '${values["github-org"]}' is not a GitHub organisation name.`,
+  );
 }
 
 const WINDOWS = process.platform === "win32";
@@ -49,27 +54,35 @@ function fail(message) {
 
 function run(command, args) {
   try {
-    return execFileSync(WINDOWS && command === "az" ? "az.cmd" : command, args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: WINDOWS,
-    }).trim();
+    return execFileSync(
+      WINDOWS && command === "az" ? "az.cmd" : command,
+      args,
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: WINDOWS,
+      },
+    ).trim();
   } catch {
     return null;
   }
 }
 
-const armGet = (url) => run("az", ["rest", "--method", "GET", "--url", url, "-o", "json"]);
+const armGet = (url) =>
+  run("az", ["rest", "--method", "GET", "--url", url, "-o", "json"]);
 
 const connectorsRaw = armGet(
   `https://management.azure.com/subscriptions/${values.subscription}/providers/Microsoft.Security/securityConnectors?api-version=${API}`,
 );
 if (!connectorsRaw) {
-  fail("Could not list security connectors. Check 'az login' and that the subscription is accessible.");
+  fail(
+    "Could not list security connectors. Check 'az login' and that the subscription is accessible.",
+  );
 }
 
 const connectors = (JSON.parse(connectorsRaw).value ?? []).filter(
-  (connector) => (connector.properties?.environmentName ?? "").toLowerCase() === "github",
+  (connector) =>
+    (connector.properties?.environmentName ?? "").toLowerCase() === "github",
 );
 
 const findings = [];
@@ -80,7 +93,8 @@ for (const connector of connectors) {
   );
   findings.push({
     name: connector.name,
-    resourceGroup: connector.id.split("/resourcegroups/")[1]?.split("/")[0] ?? "unknown",
+    resourceGroup:
+      connector.id.split("/resourcegroups/")[1]?.split("/")[0] ?? "unknown",
     authorized: Boolean(authorized),
   });
 }
@@ -94,19 +108,25 @@ if (values["github-org"]) {
 }
 
 if (values.json) {
-  process.stdout.write(`${JSON.stringify({ connectors: findings, installations }, null, 2)}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ connectors: findings, installations }, null, 2)}\n`,
+  );
 }
 
 let failures = 0;
 
 if (findings.length === 0) {
-  process.stdout.write("warn  no GitHub DevOps connector exists in this subscription\n");
+  process.stdout.write(
+    "warn  no GitHub DevOps connector exists in this subscription\n",
+  );
   failures += 1;
 }
 
 for (const finding of findings) {
   if (finding.authorized) {
-    process.stdout.write(`ok    ${finding.name} in ${finding.resourceGroup} is authorized\n`);
+    process.stdout.write(
+      `ok    ${finding.name} in ${finding.resourceGroup} is authorized\n`,
+    );
   } else {
     failures += 1;
     process.stdout.write(
@@ -123,7 +143,9 @@ if (installations !== null) {
     /security|defender/i.test(installation.app_slug ?? ""),
   );
   if (defender.length > 0) {
-    process.stdout.write(`ok    GitHub app installed: ${defender.map((i) => i.app_slug).join(", ")}\n`);
+    process.stdout.write(
+      `ok    GitHub app installed: ${defender.map((i) => i.app_slug).join(", ")}\n`,
+    );
   } else {
     failures += 1;
     process.stdout.write(
@@ -140,4 +162,6 @@ if (failures > 0) {
   process.exit(1);
 }
 
-process.stdout.write("\nDevOps connector is authorized and discovering repositories.\n");
+process.stdout.write(
+  "\nDevOps connector is authorized and discovering repositories.\n",
+);

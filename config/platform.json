@@ -1,0 +1,86 @@
+{
+  "$comment": "Declares the organisation's intended platform state. pawprint-platform.mjs compares this to reality; everything in it was verified against Azure and GitHub rather than assumed. Subscription ids are deliberately absent, as they are everywhere else: they are supplied at runtime.",
+  "manifestVersion": "1.0.0",
+  "githubOrganisation": "ninjapaw",
+  "organisationVariables": {
+    "AZURE_TENANT_ID": "c3b58b46-8d1e-4caf-8089-a2c99bb3fa8c",
+    "AZURE_LOCATION": "centralus"
+  },
+  "environments": {
+    "dev": {
+      "branch": "dev",
+      "platformResourceGroup": "NP-Platform-Dev-CentralUS",
+      "hostsDevOpsConnector": true
+    },
+    "prod": {
+      "branch": "main",
+      "platformResourceGroup": "NP-Platform-CentralUS",
+      "hostsDevOpsConnector": false
+    }
+  },
+  "repositories": {
+    "pawprint": {
+      "role": "kit",
+      "environments": {}
+    },
+    "site": {
+      "role": "workload",
+      "environments": {
+        "dev": {
+          "resourceGroup": "NP-NinjaPawsSite-Dev-CentralUS",
+          "infrastructureApp": "site-dev-infrastructure-github"
+        },
+        "prod": {
+          "resourceGroup": null,
+          "infrastructureApp": null,
+          "note": "Production has never been provisioned; the resource group does not exist."
+        }
+      }
+    },
+    "m365profiles": {
+      "role": "workload",
+      "environments": {
+        "dev": {
+          "resourceGroup": "m365profiles-dev",
+          "infrastructureApp": "m365profiles-dev-infrastructure-github"
+        },
+        "prod": {
+          "resourceGroup": null,
+          "infrastructureApp": null,
+          "note": "Configuration names m365profiles-prod, but NP-m365profiles-CentralUS exists instead. Unresolved."
+        }
+      }
+    },
+    "sentinel-optimizer": {
+      "role": "workload",
+      "environments": {
+        "dev": {
+          "resourceGroup": "NP-SentinelOptimizer-Dev-CentralUS",
+          "infrastructureApp": "sentinel-optimizer-dev-infrastructure-github",
+          "apiApp": "sentinel-optimizer-dev-api-github",
+          "rbacAdmin": true
+        },
+        "prod": {
+          "resourceGroup": "NP-SentinelOptimizer-CentralUS",
+          "infrastructureApp": null,
+          "note": "Resource group exists; no production identity has been created."
+        }
+      }
+    },
+    "ninjapaws-cloud-security-dojo": {
+      "role": "workload",
+      "environments": {
+        "dev": {
+          "resourceGroup": "NP-ninjapaws-dojo-Dev-CentralUS",
+          "infrastructureApp": "ninjapaws-cloud-security-dojo-dev-github",
+          "rbacAdmin": true
+        },
+        "prod": {
+          "resourceGroup": "NP-ninjapaws-dojo-Prod-CentralUS",
+          "infrastructureApp": "ninjapaws-cloud-security-dojo-prod-github",
+          "note": "Named Prod but configured against the development subscription. Unresolved."
+        }
+      }
+    }
+  }
+}

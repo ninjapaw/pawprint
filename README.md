@@ -329,6 +329,37 @@ Reusable workflows in this kit read these as `vars`, and fail with an
 actionable message when one is unset rather than letting `azure/login` fail
 with an opaque error.
 
+### Setting up the platform
+
+The order matters, because each step depends on the one above it. What the
+organisation should look like is declared in `config/platform.json`, and the
+status command compares that to reality rather than to intent:
+
+```bash
+npm run platform:status -- --environment dev --subscription <id>
+```
+
+It reports three kinds of line. `ok` needs nothing. `MISSING` is a gap that
+tooling can close. `DECIDE` is a question the tooling cannot answer, such as a
+resource group whose name in configuration does not match what exists in Azure.
+
+1. **Organisation variables.** `AZURE_TENANT_ID` and `AZURE_LOCATION` are set
+   once for the organisation; everything else is per environment.
+2. **Platform resource group.** `az deployment sub create --template-file
+   platform/org.bicep --parameters platform/org.<env>.bicepparam`. Shared
+   monitoring, and optionally the tier 0 vault and DNS zones.
+3. **Per repository and environment.** `npm run onboard -- --repo <org/repo>
+   --environment <env> --subscription <id> --resource-group <rg>`. Creates the
+   application, the federated credential, the role assignments and the
+   variables, and binds the environment to its branch. Defaults to a dry run.
+4. **The DevOps connector**, once for the organisation, interactively. See
+   above; this is the one step that cannot be scripted.
+
+Re-run the status command after each step. A green dev environment looks like
+every repository having an application, a credential whose subject matches what
+GitHub actually emits, roles on its own resource group, and an environment
+restricted to its branch.
+
 ## CI and adoption
 
 Run the local checks before opening a pull request:
