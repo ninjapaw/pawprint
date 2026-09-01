@@ -9,11 +9,13 @@
   "environments": {
     "dev": {
       "branch": "dev",
+      "subscriptionRef": "dev",
       "platformResourceGroup": "NP-Platform-Dev-CentralUS",
       "hostsDevOpsConnector": true
     },
     "prod": {
       "branch": "main",
+      "subscriptionRef": "prod",
       "platformResourceGroup": "NP-Platform-CentralUS",
       "hostsDevOpsConnector": false
     }
@@ -62,8 +64,10 @@
         },
         "prod": {
           "resourceGroup": "NP-SentinelOptimizer-CentralUS",
-          "infrastructureApp": null,
-          "note": "Resource group exists; no production identity has been created."
+          "infrastructureApp": "sentinel-optimizer-prod-infrastructure-github",
+          "apiApp": "sentinel-optimizer-prod-api-github",
+          "rbacAdmin": true,
+          "apiNote": "The production resource group holds only static sites; the API App Service was never provisioned, so there is nothing to scope the API identity to. Grant Website Contributor on the API site once it exists."
         }
       }
     },
@@ -77,8 +81,10 @@
         },
         "prod": {
           "resourceGroup": "NP-ninjapaws-dojo-Prod-CentralUS",
+          "subscriptionRef": "dev",
           "infrastructureApp": "ninjapaws-cloud-security-dojo-prod-github",
-          "note": "Named Prod but configured against the development subscription. Unresolved."
+          "rbacAdmin": true,
+          "note": "Production runs in the development subscription. Deliberate for a training environment that must never share a subscription with production workloads, but it means prod here is not the prod subscription."
         }
       }
     }

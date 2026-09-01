@@ -336,20 +336,34 @@ organisation should look like is declared in `config/platform.json`, and the
 status command compares that to reality rather than to intent:
 
 ```bash
-npm run platform:status -- --environment dev --subscription <id>
+npm run platform:status -- --environment dev --subscription dev=<id>
 ```
 
 It reports three kinds of line. `ok` needs nothing. `MISSING` is a gap that
 tooling can close. `DECIDE` is a question the tooling cannot answer, such as a
 resource group whose name in configuration does not match what exists in Azure.
 
+`--subscription` takes `<ref>=<id>` and may be repeated. The refs are the
+`subscriptionRef` values in the manifest, which exist because an environment
+does not always live in the subscription its name implies: the dojo's
+production environment deliberately runs in the development subscription so a
+deliberately-vulnerable training estate can never share a subscription with
+real production workloads. Declaring that in the manifest keeps it a stated
+decision instead of a finding that looks like a misconfiguration every time
+anyone checks.
+
+```bash
+npm run platform:status -- --environment prod \
+  --subscription prod=<prod-id> --subscription dev=<dev-id>
+```
+
 1. **Organisation variables.** `AZURE_TENANT_ID` and `AZURE_LOCATION` are set
    once for the organisation; everything else is per environment.
 2. **Platform resource group.** `az deployment sub create --template-file
-   platform/org.bicep --parameters platform/org.<env>.bicepparam`. Shared
+platform/org.bicep --parameters platform/org.<env>.bicepparam`. Shared
    monitoring, and optionally the tier 0 vault and DNS zones.
 3. **Per repository and environment.** `npm run onboard -- --repo <org/repo>
-   --environment <env> --subscription <id> --resource-group <rg>`. Creates the
+--environment <env> --subscription <id> --resource-group <rg>`. Creates the
    application, the federated credential, the role assignments and the
    variables, and binds the environment to its branch. Defaults to a dry run.
 4. **The DevOps connector**, once for the organisation, interactively. See

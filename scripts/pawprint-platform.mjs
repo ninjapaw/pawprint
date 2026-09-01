@@ -27,18 +27,26 @@ const WINDOWS = process.platform === "win32";
 const { values } = parseArgs({
   options: {
     environment: { type: "string", default: "dev" },
-    subscription: { type: "string" },
+    subscription: { type: "string", multiple: true, default: [] },
     manifest: { type: "string", default: MANIFEST },
   },
 });
 
-if (!values.subscription) {
-  fail(
-    "--subscription is required; subscription ids are supplied at runtime, not committed.",
-  );
+// Accepts ref=id pairs because an environment is not always one subscription:
+// a workload may sit somewhere other than its environment's default, and that
+// should be declared rather than reported as a missing resource group.
+const subscriptions = new Map();
+for (const pair of values.subscription) {
+  const [ref, id] = pair.includes("=") ? pair.split("=", 2) : [null, pair];
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
+    fail(`'${id}' is not a subscription id.`);
+  }
+  subscriptions.set(ref ?? values.environment, id);
 }
-if (!/^[0-9a-fA-F-]{36}$/.test(values.subscription)) {
-  fail(`--subscription '${values.subscription}' is not a subscription id.`);
+if (subscriptions.size === 0) {
+  fail(
+    "--subscription <ref>=<id> is required; subscription ids are supplied at runtime, not committed.",
+  );
 }
 
 const manifest = JSON.parse(readFileSync(values.manifest, "utf8"));
@@ -51,7 +59,18 @@ if (!environment) {
 }
 
 const organisation = manifest.githubOrganisation;
-const subscription = values.subscription;
+
+function subscriptionFor(ref) {
+  const resolved = subscriptions.get(ref ?? environmentName);
+  if (!resolved) {
+    fail(
+      `No subscription supplied for '${ref ?? environmentName}'. Pass --subscription ${ref ?? environmentName}=<id>.`,
+    );
+  }
+  return resolved;
+}
+
+const subscription = subscriptionFor(environment.subscriptionRef);
 
 let problems = 0;
 let blocked = 0;
@@ -198,6 +217,8 @@ for (const [name, repository] of Object.entries(manifest.repositories ?? {})) {
     undecided(declared.note);
   }
 
+  const repositorySubscription = subscriptionFor(declared.subscriptionRef);
+
   if (
     run("az", [
       "group",
@@ -205,13 +226,18 @@ for (const [name, repository] of Object.entries(manifest.repositories ?? {})) {
       "--name",
       declared.resourceGroup,
       "--subscription",
-      subscription,
+      repositorySubscription,
     ]) === "true"
   ) {
-    ok(`resource group ${declared.resourceGroup}`);
+    ok(
+      `resource group ${declared.resourceGroup}` +
+        (declared.subscriptionRef
+          ? ` (in the ${declared.subscriptionRef} subscription)`
+          : ""),
+    );
   } else {
     gap(
-      `resource group ${declared.resourceGroup} does not exist in this subscription`,
+      `resource group ${declared.resourceGroup} does not exist in the ${declared.subscriptionRef ?? environmentName} subscription`,
     );
   }
 
@@ -258,11 +284,17 @@ for (const [name, repository] of Object.entries(manifest.repositories ?? {})) {
     if (!appName) {
       continue;
     }
-    checkApplication(kind, appName, declared, name);
+    checkApplication(kind, appName, declared, name, repositorySubscription);
   }
 }
 
-function checkApplication(kind, appName, declared, repositoryName) {
+function checkApplication(
+  kind,
+  appName,
+  declared,
+  repositoryName,
+  repositorySubscription,
+) {
   // Queried by --display-name rather than a JMESPath filter: the filter needs
   // embedded quotes, which a shell strips.
   const appId = run("az", [
@@ -339,7 +371,7 @@ function checkApplication(kind, appName, declared, repositoryName) {
   // Listed across the subscription and filtered by prefix: a role scoped to a
   // single resource inside the group, which is what a well-scoped workload
   // identity looks like, does not appear when querying the group scope.
-  const groupScope = `/subscriptions/${subscription}/resourceGroups/${declared.resourceGroup}`;
+  const groupScope = `/subscriptions/${repositorySubscription}/resourceGroups/${declared.resourceGroup}`;
   const assignments = JSON.parse(
     run("az", [
       "role",
@@ -349,7 +381,7 @@ function checkApplication(kind, appName, declared, repositoryName) {
       appId,
       "--all",
       "--subscription",
-      subscription,
+      repositorySubscription,
       "--query",
       "[].{role:roleDefinitionName,scope:scope}",
       "-o",
@@ -360,9 +392,16 @@ function checkApplication(kind, appName, declared, repositoryName) {
   );
 
   if (assignments.length === 0) {
-    gap(
-      `${kind} identity holds no roles on ${declared.resourceGroup}; deployments would fail on the first call`,
-    );
+    // A documented reason means the absence is understood and owed a decision,
+    // not an oversight to be closed by handing out a role.
+    const documented = declared[`${kind}Note`];
+    if (documented) {
+      undecided(`${kind} identity holds no roles: ${documented}`);
+    } else {
+      gap(
+        `${kind} identity holds no roles on ${declared.resourceGroup}; deployments would fail on the first call`,
+      );
+    }
   } else {
     const described = assignments.map((assignment) =>
       assignment.scope.toLowerCase() === groupScope.toLowerCase()
