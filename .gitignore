@@ -41,6 +41,7 @@ output/
 .pawprint-local-admin.json
 .pawprint-app-manifest.json
 .pawprint-install.json
+.pawprint-onboard.json
 .pawprint-graph-body.json
 
 # Adopter-owned configuration override, which carries environment-specific names
