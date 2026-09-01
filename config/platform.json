@@ -47,9 +47,8 @@
           "infrastructureApp": "m365profiles-dev-infrastructure-github"
         },
         "prod": {
-          "resourceGroup": null,
-          "infrastructureApp": null,
-          "note": "Configuration names m365profiles-prod, but NP-m365profiles-CentralUS exists instead. Unresolved."
+          "resourceGroup": "NP-m365profiles-CentralUS",
+          "infrastructureApp": "m365profiles-prod-infrastructure-github"
         }
       }
     },
