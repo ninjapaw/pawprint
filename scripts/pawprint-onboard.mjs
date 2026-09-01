@@ -53,7 +53,12 @@ const { values } = parseArgs({
   },
 });
 
-for (const required of ["repo", "environment", "subscription", "resource-group"]) {
+for (const required of [
+  "repo",
+  "environment",
+  "subscription",
+  "resource-group",
+]) {
   if (!values[required]) {
     fail(`--${required} is required.`);
   }
@@ -65,7 +70,8 @@ for (const required of ["repo", "environment", "subscription", "resource-group"]
 const SHAPES = {
   repo: /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/,
   environment: /^[a-z][a-z0-9-]{0,31}$/,
-  subscription: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+  subscription:
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
   "resource-group": /^[A-Za-z0-9._()-]{1,90}$/,
 };
 for (const [name, shape] of Object.entries(SHAPES)) {
@@ -75,7 +81,9 @@ for (const [name, shape] of Object.entries(SHAPES)) {
 }
 for (const reviewer of values["required-reviewer"]) {
   if (!/^\d+$/.test(reviewer)) {
-    fail(`--required-reviewer must be a numeric GitHub user id, got '${reviewer}'.`);
+    fail(
+      `--required-reviewer must be a numeric GitHub user id, got '${reviewer}'.`,
+    );
   }
 }
 
@@ -100,7 +108,8 @@ const binary = (command) => (WINDOWS && command === "az" ? "az.cmd" : command);
 
 // A shell concatenates rather than escapes, so anything containing a space has
 // to carry its own quotes. Every value reaching here is validated above.
-const quoted = (argument) => (WINDOWS && /\s/.test(argument) ? `"${argument}"` : argument);
+const quoted = (argument) =>
+  WINDOWS && /\s/.test(argument) ? `"${argument}"` : argument;
 
 function run(command, args, { allowFailure = false } = {}) {
   try {
@@ -136,20 +145,49 @@ function unchanged(description) {
 
 // --- preflight -------------------------------------------------------------
 
-if (!az(["account", "show", "--query", "id", "-o", "tsv"], { allowFailure: true })) {
-  fail("Azure CLI is not signed in. Run 'az login' first; onboarding is deliberately interactive.");
+if (
+  !az(["account", "show", "--query", "id", "-o", "tsv"], { allowFailure: true })
+) {
+  fail(
+    "Azure CLI is not signed in. Run 'az login' first; onboarding is deliberately interactive.",
+  );
 }
 if (!gh(["auth", "status"], { allowFailure: true }) && !process.env.GH_TOKEN) {
   fail("GitHub CLI is not signed in. Run 'gh auth login' first.");
 }
-if (!az(["account", "show", "--subscription", subscriptionId, "--query", "id", "-o", "tsv"], { allowFailure: true })) {
+if (
+  !az(
+    [
+      "account",
+      "show",
+      "--subscription",
+      subscriptionId,
+      "--query",
+      "id",
+      "-o",
+      "tsv",
+    ],
+    { allowFailure: true },
+  )
+) {
   fail(`Subscription ${subscriptionId} is not accessible from this session.`);
 }
-if (!gh(["repo", "view", repository, "--json", "name"], { allowFailure: true })) {
+if (
+  !gh(["repo", "view", repository, "--json", "name"], { allowFailure: true })
+) {
   fail(`Repository ${repository} is not accessible.`);
 }
 
-const tenantId = az(["account", "show", "--subscription", subscriptionId, "--query", "tenantId", "-o", "tsv"]);
+const tenantId = az([
+  "account",
+  "show",
+  "--subscription",
+  subscriptionId,
+  "--query",
+  "tenantId",
+  "-o",
+  "tsv",
+]);
 
 process.stdout.write(
   `\n${dryRun ? "Dry run" : "Applying"}: ${repository} / ${environmentName}\n` +
@@ -160,12 +198,20 @@ process.stdout.write(
 
 const branch = BRANCH_FOR_ENVIRONMENT[environmentName];
 if (!branch) {
-  fail(`No branch is bound to environment '${environmentName}'. Extend BRANCH_FOR_ENVIRONMENT first.`);
+  fail(
+    `No branch is bound to environment '${environmentName}'. Extend BRANCH_FOR_ENVIRONMENT first.`,
+  );
 }
 
-const reviewers = values["required-reviewer"].map((id) => ({ type: "User", id: Number(id) }));
+const reviewers = values["required-reviewer"].map((id) => ({
+  type: "User",
+  id: Number(id),
+}));
 const environmentBody = {
-  deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+  deployment_branch_policy: {
+    protected_branches: false,
+    custom_branch_policies: true,
+  },
   ...(reviewers.length ? { reviewers } : {}),
 };
 
@@ -173,13 +219,25 @@ step(
   `bind environment '${environmentName}' to branch '${branch}'` +
     (reviewers.length ? ` with ${reviewers.length} required reviewer(s)` : ""),
   () => {
-    ghJson(`repos/${repository}/environments/${environmentName}`, "PUT", environmentBody);
-    const existing = ghJson(`repos/${repository}/environments/${environmentName}/deployment-branch-policies`);
-    const already = (existing?.branch_policies ?? []).some((policy) => policy.name === branch);
+    ghJson(
+      `repos/${repository}/environments/${environmentName}`,
+      "PUT",
+      environmentBody,
+    );
+    const existing = ghJson(
+      `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+    );
+    const already = (existing?.branch_policies ?? []).some(
+      (policy) => policy.name === branch,
+    );
     if (!already) {
-      ghJson(`repos/${repository}/environments/${environmentName}/deployment-branch-policies`, "POST", {
-        name: branch,
-      });
+      ghJson(
+        `repos/${repository}/environments/${environmentName}/deployment-branch-policies`,
+        "POST",
+        {
+          name: branch,
+        },
+      );
     }
   },
 );
@@ -187,17 +245,24 @@ step(
 // --- Entra applications ----------------------------------------------------
 
 const infrastructure = ensureApplication(
-  values["infrastructure-app"] ?? `${slug}-${environmentName}-infrastructure-github`,
+  values["infrastructure-app"] ??
+    `${slug}-${environmentName}-infrastructure-github`,
   "infrastructure",
 );
 const api = values["with-api"]
-  ? ensureApplication(values["api-app"] ?? `${slug}-${environmentName}-api-github`, "api")
+  ? ensureApplication(
+      values["api-app"] ?? `${slug}-${environmentName}-api-github`,
+      "api",
+    )
   : null;
 
 // The default subject is what GitHub actually emits unless a repository opts
 // into immutable subjects. Mixing the two forms is how a credential silently
 // stops matching.
-ensureFederatedCredential(infrastructure, `github-${environmentName}-infrastructure`);
+ensureFederatedCredential(
+  infrastructure,
+  `github-${environmentName}-infrastructure`,
+);
 if (api) {
   ensureFederatedCredential(api, `github-${environmentName}-api`);
 }
@@ -228,7 +293,9 @@ if (!dryRun && created.length > 0) {
     : { schemaVersion: "1.0.0", objects: [] };
   manifest.objects.push(...created);
   writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
-  process.stdout.write(`\nRecorded ${created.length} created object(s) in .pawprint-onboard.json\n`);
+  process.stdout.write(
+    `\nRecorded ${created.length} created object(s) in .pawprint-onboard.json\n`,
+  );
 }
 
 process.stdout.write(
@@ -259,16 +326,39 @@ function ghJson(path, method = "GET", body) {
 
 function ensureApplication(displayName, kind) {
   const existingId = az(
-    ["ad", "app", "list", "--display-name", displayName, "--query", "[0].appId", "-o", "tsv"],
+    [
+      "ad",
+      "app",
+      "list",
+      "--display-name",
+      displayName,
+      "--query",
+      "[0].appId",
+      "-o",
+      "tsv",
+    ],
     { allowFailure: true },
   );
 
   if (existingId) {
     unchanged(`application ${displayName} exists (${existingId})`);
-    const objectId = az(["ad", "app", "show", "--id", existingId, "--query", "id", "-o", "tsv"]);
-    const principalId = az(["ad", "sp", "show", "--id", existingId, "--query", "id", "-o", "tsv"], {
-      allowFailure: true,
-    });
+    const objectId = az([
+      "ad",
+      "app",
+      "show",
+      "--id",
+      existingId,
+      "--query",
+      "id",
+      "-o",
+      "tsv",
+    ]);
+    const principalId = az(
+      ["ad", "sp", "show", "--id", existingId, "--query", "id", "-o", "tsv"],
+      {
+        allowFailure: true,
+      },
+    );
     return { displayName, appId: existingId, objectId, principalId, kind };
   }
 
@@ -276,9 +366,21 @@ function ensureApplication(displayName, kind) {
   // a naming mismatch rather than an intent, and the duplicate is invisible
   // until something authenticates as the wrong one.
   const nearMatches = JSON.parse(
-    az(["ad", "app", "list", "--all", "--query", "[].{name:displayName,appId:appId}", "-o", "json"], {
-      allowFailure: true,
-    }) ?? "[]",
+    az(
+      [
+        "ad",
+        "app",
+        "list",
+        "--all",
+        "--query",
+        "[].{name:displayName,appId:appId}",
+        "-o",
+        "json",
+      ],
+      {
+        allowFailure: true,
+      },
+    ) ?? "[]",
   ).filter(
     (candidate) =>
       candidate.name !== displayName &&
@@ -287,7 +389,9 @@ function ensureApplication(displayName, kind) {
   );
 
   if (nearMatches.length > 0 && !values["allow-new-app"]) {
-    const listed = nearMatches.map((m) => `      ${m.name}  (${m.appId})`).join("\n");
+    const listed = nearMatches
+      .map((m) => `      ${m.name}  (${m.appId})`)
+      .join("\n");
     fail(
       `Refusing to create '${displayName}': an application for this repository already exists under a different name.\n${listed}\n` +
         `Adopt it with --${kind === "api" ? "api" : "infrastructure"}-app '<name>', or pass --allow-new-app if a second identity is genuinely wanted.`,
@@ -296,22 +400,70 @@ function ensureApplication(displayName, kind) {
 
   const result = step(`create application ${displayName}`, () => {
     const appId = az([
-      "ad", "app", "create",
-      "--display-name", displayName,
-      "--sign-in-audience", "AzureADMyOrg",
-      "--query", "appId", "-o", "tsv",
-    ]);    const objectId = az(["ad", "app", "show", "--id", appId, "--query", "id", "-o", "tsv"]);
+      "ad",
+      "app",
+      "create",
+      "--display-name",
+      displayName,
+      "--sign-in-audience",
+      "AzureADMyOrg",
+      "--query",
+      "appId",
+      "-o",
+      "tsv",
+    ]);
+    const objectId = az([
+      "ad",
+      "app",
+      "show",
+      "--id",
+      appId,
+      "--query",
+      "id",
+      "-o",
+      "tsv",
+    ]);
     // Tagged so uninstall can find it even if the manifest is lost.
-    az(["ad", "app", "update", "--id", appId, "--set", `tags=[\\"${PAWPRINT_TAG}\\"]`], {
-      allowFailure: true,
-    });
-    const principalId = az(["ad", "sp", "create", "--id", appId, "--query", "id", "-o", "tsv"]);
+    az(
+      [
+        "ad",
+        "app",
+        "update",
+        "--id",
+        appId,
+        "--set",
+        `tags=[\\"${PAWPRINT_TAG}\\"]`,
+      ],
+      {
+        allowFailure: true,
+      },
+    );
+    const principalId = az([
+      "ad",
+      "sp",
+      "create",
+      "--id",
+      appId,
+      "--query",
+      "id",
+      "-o",
+      "tsv",
+    ]);
     created.push({ kind: "application", displayName, appId, objectId });
-    created.push({ kind: "servicePrincipal", displayName, appId, id: principalId });
+    created.push({
+      kind: "servicePrincipal",
+      displayName,
+      appId,
+      id: principalId,
+    });
     return { appId, objectId, principalId };
   });
 
-  return { displayName, kind, ...(result ?? { appId: "<new>", objectId: "<new>", principalId: "<new>" }) };
+  return {
+    displayName,
+    kind,
+    ...(result ?? { appId: "<new>", objectId: "<new>", principalId: "<new>" }),
+  };
 }
 
 function credentialFile(payload) {
@@ -327,16 +479,29 @@ function ensureFederatedCredential(application, name) {
 
   if (application.objectId !== "<new>") {
     const existing = az(
-      ["ad", "app", "federated-credential", "list", "--id", application.objectId, "-o", "json"],
+      [
+        "ad",
+        "app",
+        "federated-credential",
+        "list",
+        "--id",
+        application.objectId,
+        "-o",
+        "json",
+      ],
       { allowFailure: true },
     );
     const parsed = existing ? JSON.parse(existing) : [];
 
     // Azure rejects a duplicate subject, and an existing credential under a
     // different name already grants exactly the trust being asked for.
-    const bySubject = parsed.find((credential) => credential.subject === subject);
+    const bySubject = parsed.find(
+      (credential) => credential.subject === subject,
+    );
     if (bySubject) {
-      unchanged(`federated credential '${bySubject.name}' already trusts ${subject}`);
+      unchanged(
+        `federated credential '${bySubject.name}' already trusts ${subject}`,
+      );
       return;
     }
 
@@ -347,13 +512,24 @@ function ensureFederatedCredential(application, name) {
         return;
       }
       step(`correct federated credential ${name} subject to ${subject}`, () => {
-        const file = credentialFile({ name, issuer: ISSUER, subject, audiences: [AUDIENCE] });
+        const file = credentialFile({
+          name,
+          issuer: ISSUER,
+          subject,
+          audiences: [AUDIENCE],
+        });
         try {
           az([
-            "ad", "app", "federated-credential", "update",
-            "--id", application.objectId,
-            "--federated-credential-id", match.id,
-            "--parameters", `@${file}`,
+            "ad",
+            "app",
+            "federated-credential",
+            "update",
+            "--id",
+            application.objectId,
+            "--federated-credential-id",
+            match.id,
+            "--parameters",
+            `@${file}`,
           ]);
         } finally {
           rmSync(file, { force: true });
@@ -373,14 +549,23 @@ function ensureFederatedCredential(application, name) {
     });
     try {
       az([
-        "ad", "app", "federated-credential", "create",
-        "--id", application.objectId,
-        "--parameters", `@${file}`,
+        "ad",
+        "app",
+        "federated-credential",
+        "create",
+        "--id",
+        application.objectId,
+        "--parameters",
+        `@${file}`,
       ]);
     } finally {
       rmSync(file, { force: true });
     }
-    created.push({ kind: "federatedIdentityCredential", displayName: name, parentAppId: application.appId });
+    created.push({
+      kind: "federatedIdentityCredential",
+      displayName: name,
+      parentAppId: application.appId,
+    });
   });
 }
 
@@ -388,12 +573,19 @@ function ensureRole(application, role, roleScope) {
   if (application.principalId && application.principalId !== "<new>") {
     const existing = az(
       [
-        "role", "assignment", "list",
-        "--assignee", application.appId,
-        "--scope", roleScope,
-        "--subscription", subscriptionId,
-        "--query", `[?roleDefinitionName=='${role}'] | length(@)`,
-        "-o", "tsv",
+        "role",
+        "assignment",
+        "list",
+        "--assignee",
+        application.appId,
+        "--scope",
+        roleScope,
+        "--subscription",
+        subscriptionId,
+        "--query",
+        `[?roleDefinitionName=='${role}'] | length(@)`,
+        "-o",
+        "tsv",
       ],
       { allowFailure: true },
     );
@@ -403,21 +595,42 @@ function ensureRole(application, role, roleScope) {
     }
   }
 
-  step(`grant ${role} to ${application.displayName} on ${roleScope.split("/").pop()}`, () => {
-    az([
-      "role", "assignment", "create",
-      "--assignee-object-id", application.principalId,
-      "--assignee-principal-type", "ServicePrincipal",
-      "--role", role,
-      "--scope", roleScope,
-      "--subscription", subscriptionId,
-      "-o", "none",
-    ]);
-  });
+  step(
+    `grant ${role} to ${application.displayName} on ${roleScope.split("/").pop()}`,
+    () => {
+      az([
+        "role",
+        "assignment",
+        "create",
+        "--assignee-object-id",
+        application.principalId,
+        "--assignee-principal-type",
+        "ServicePrincipal",
+        "--role",
+        role,
+        "--scope",
+        roleScope,
+        "--subscription",
+        subscriptionId,
+        "-o",
+        "none",
+      ]);
+    },
+  );
 }
 
 function setVariable(name, value) {
   step(`set variable ${name} on ${environmentName}`, () => {
-    gh(["variable", "set", name, "--env", environmentName, "--repo", repository, "--body", String(value)]);
+    gh([
+      "variable",
+      "set",
+      name,
+      "--env",
+      environmentName,
+      "--repo",
+      repository,
+      "--body",
+      String(value),
+    ]);
   });
 }
