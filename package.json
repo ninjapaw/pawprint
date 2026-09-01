@@ -25,6 +25,7 @@
     "test:deploy-config": "node scripts/test-deploy-config.mjs",
     "vendor:sync": "node scripts/vendor-sync.mjs",
     "vendor:check": "node scripts/vendor-sync.mjs --verify-sources",
+    "connector:check": "node scripts/check-devops-connector.mjs",
     "test": "npm run schema:check && npm run config:check && npm run scenario:check && npm run test:guardrails && npm run test:policy && npm run test:deploy-config && npm run vendor:check"
   },
   "devDependencies": {

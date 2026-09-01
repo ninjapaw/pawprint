@@ -275,6 +275,31 @@ az deployment sub create \
 Dev and production live in separate subscriptions, so there is one platform
 resource group per environment rather than one for the organisation.
 
+### The Defender DevOps connector is platform, and is not infrastructure as code
+
+One connector covers an entire GitHub organisation, so it belongs beside the
+other shared resources rather than inside a workload's resource group. Putting
+it in a workload group couples organisation-wide security posture to that
+workload's lifetime, which for an ephemeral or reapable environment means a
+teardown silently removes coverage for every repository.
+
+It is deliberately not declared in Bicep. The ARM resource can be created
+declaratively, but authorization cannot: completing a connector needs an OAuth
+code that only a browser flow issues, and a GitHub App that an organisation
+owner installs. A template can therefore only ever produce the half that does
+nothing, and would recreate that half on every run. A connector in that state
+reports as provisioned and discovers no repositories.
+
+So the connector is a one-time manual step, and what is automated is noticing
+when it stops being healthy:
+
+```bash
+npm run connector:check -- --subscription <id> --github-org <org>
+```
+
+The check queries the `devops/default` sub-resource, which does not exist until
+authorization succeeds, rather than trusting that the ARM resource exists.
+
 ### GitHub configuration scope
 
 Where a value lives is decided by how widely it is identical and whether it is
