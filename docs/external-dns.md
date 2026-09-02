@@ -55,14 +55,17 @@ npm run portal
 ```
 
 Create a temporary seven-day account-owned bootstrap token from Cloudflare's
-`Create Account Tokens` template. Keep `Account API Tokens Write`, add `Zone
-Read`, and restrict zone access to the intended zone. The page uses it once to
-create a new seven-day token restricted to `Zone Read` and `DNS Write` for that
-zone. It verifies the child by creating and deleting a temporary TXT record,
-then streams only the child token to `gh secret set` over stdin for the selected
-repository environments. Neither token is written to disk, returned by the API,
-or retained by the browser. Revoke the bootstrap token in Cloudflare after the
-child is stored successfully.
+`Create Account Tokens` template. Cloudflare requires the token creator to be a
+Super Administrator on that account. Keep `Account API Tokens Write`, add `Zone
+Read`, and restrict zone access to the intended zone. PawPrint verifies the
+bootstrap is active for the discovered account, confirms it can list token
+permission groups, and confirms it can create the child. It then creates a new
+seven-day token restricted to `Zone Read` and `DNS Write` for that zone. The
+child is verified by creating and deleting a temporary TXT record, then only the
+child is streamed to `gh secret set` over stdin for the selected repository
+environments. Neither token is written to disk, returned by the API, or retained
+by the browser. Revoke the bootstrap token in Cloudflare after the child is
+stored successfully.
 
 GitHub stores the secret value. Pawprint stores only the token ID and expiry as
 GitHub Environment variables so readiness and rotation can be reported without

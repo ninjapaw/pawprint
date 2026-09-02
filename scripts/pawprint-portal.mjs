@@ -1232,10 +1232,27 @@ async function cloudflareZone(token) {
 }
 
 async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
+  const verification = await cloudflareJson(
+    `/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+    bootstrapToken,
+  ).catch(() => {
+    throw new HttpError(
+      400,
+      "The bootstrap token must be an active account-owned token for this Cloudflare account.",
+    );
+  });
+  if (verification.result?.status !== "active") {
+    throw new HttpError(400, "The temporary Cloudflare bootstrap token is not active.");
+  }
   const groups = await cloudflareJson(
     `/accounts/${encodeURIComponent(accountId)}/tokens/permission_groups`,
     bootstrapToken,
-  );
+  ).catch(() => {
+    throw new HttpError(
+      403,
+      "Bootstrap requires Account API Tokens Write. The Cloudflare account must grant its creator Super Administrator access to create or update account-owned tokens.",
+    );
+  });
   const required = ["Zone Read", "DNS Write"];
   const permissionGroups = required.map((name) =>
     groups.result?.find(
@@ -1271,7 +1288,12 @@ async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
         },
       ],
     },
-  );
+  ).catch(() => {
+    throw new HttpError(
+      403,
+      "Cloudflare did not allow creation of the restricted DNS token. Confirm Account API Tokens Write and Super Administrator access for the bootstrap token creator.",
+    );
+  });
   if (
     !/^[a-f0-9]{32}$/i.test(created.result?.id ?? "") ||
     typeof created.result?.value !== "string" ||

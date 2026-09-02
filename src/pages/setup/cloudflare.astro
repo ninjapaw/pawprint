@@ -45,7 +45,7 @@ import Disclaimer from "../../components/Disclaimer.astro";
           <div class="step-number">1</div>
           <div>
             <h2>Create a seven-day bootstrap token</h2>
-            <p>In Cloudflare, select the <strong>Create Account Tokens</strong> template. Keep <strong>Account API Tokens Write</strong>, add <strong>Zone Read</strong>, restrict the zone to <strong>ninjapaws.org</strong>, and set expiry to <strong>7 days</strong>. This temporary token is used once to create the restricted deployment token.</p>
+            <p>In Cloudflare, select the <strong>Create Account Tokens</strong> template. The creator must be an account <strong>Super Administrator</strong>. Keep <strong>Account API Tokens Write</strong>, add <strong>Zone Read</strong>, restrict the zone to <strong>ninjapaws.org</strong>, and set expiry to <strong>7 days</strong>. This temporary token is used once to create the restricted deployment token.</p>
             <button type="button" class="step-action" data-open-cloudflare>Open Cloudflare in Edge <ExternalLink aria-hidden="true" size={16} /></button>
             <a class="provider-fallback" href="https://dash.cloudflare.com/?to=/:account/api-tokens" target="_blank" rel="noreferrer">Open in this browser instead</a>
           </div>
