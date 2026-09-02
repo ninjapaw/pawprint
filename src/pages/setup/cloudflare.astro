@@ -44,8 +44,8 @@ import Disclaimer from "../../components/Disclaimer.astro";
         <li class="connector-step">
           <div class="step-number">1</div>
           <div>
-            <h2>Create a service token</h2>
-            <p>In Cloudflare, create an account-owned API token scoped only to <strong>ninjapaws.org</strong>. Grant <strong>Zone Read</strong> and <strong>DNS Write</strong>. No account settings, Workers, TLS, WAF, or global API key.</p>
+            <h2>Create a seven-day bootstrap token</h2>
+            <p>In Cloudflare, select the <strong>Create Account Tokens</strong> template. Keep <strong>Account API Tokens Write</strong>, add <strong>Zone Read</strong>, restrict the zone to <strong>ninjapaws.org</strong>, and set expiry to <strong>7 days</strong>. This temporary token is used once to create the restricted deployment token.</p>
             <button type="button" class="step-action" data-open-cloudflare>Open Cloudflare in Edge <ExternalLink aria-hidden="true" size={16} /></button>
             <a class="provider-fallback" href="https://dash.cloudflare.com/?to=/:account/api-tokens" target="_blank" rel="noreferrer">Open in this browser instead</a>
           </div>
@@ -54,10 +54,10 @@ import Disclaimer from "../../components/Disclaimer.astro";
         <li class="connector-step">
           <div class="step-number">2</div>
           <div>
-            <h2>Verify and store</h2>
-            <p>PawPrint checks the active zone, creates and removes a temporary TXT probe, then sends the token over stdin to GitHub Environment secrets for Site development and production.</p>
+            <h2>Create, verify, and store the DNS token</h2>
+            <p>PawPrint uses the bootstrap token to create a new seven-day account token with only <strong>Zone Read</strong> and <strong>DNS Write</strong> for <strong>ninjapaws.org</strong>, verifies it with a temporary TXT probe, then sends only that new token over stdin to GitHub Environment secrets for Site development and production.</p>
             <form class="guided-token-form" data-cloudflare-form>
-              <label for="cloudflare-token"><KeyRound aria-hidden="true" size={16} /> Account API token</label>
+              <label for="cloudflare-token"><KeyRound aria-hidden="true" size={16} /> Temporary bootstrap token</label>
               <div>
                 <input id="cloudflare-token" name="token" type="password" autocomplete="off" spellcheck="false" required minlength="20" />
                 <button type="submit">Verify and store</button>
@@ -76,7 +76,7 @@ import Disclaimer from "../../components/Disclaimer.astro";
               <div><dt>Token expiry</dt><dd>Checking</dd></div>
               <div><dt>Deployment workflow</dt><dd>Checking</dd></div>
             </dl>
-            <p class="guided-message" data-cloudflare-message aria-live="polite">No token is retained by this browser or written to disk.</p>
+            <p class="guided-message" data-cloudflare-message aria-live="polite">No token is retained by this browser or written to disk. After successful setup, revoke the bootstrap token in Cloudflare; PawPrint never stores it.</p>
           </div>
         </li>
 

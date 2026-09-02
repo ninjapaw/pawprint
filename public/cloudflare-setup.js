@@ -56,7 +56,7 @@ form.addEventListener("submit", async (event) => {
   const token = form.elements.token;
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
-  message.textContent = "Verifying zone read and DNS write access...";
+  message.textContent = "Creating and verifying the restricted DNS token...";
   try {
     const response = await fetch("/api/setup/cloudflare/connect", {
       method: "POST",

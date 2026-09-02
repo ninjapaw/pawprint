@@ -1210,16 +1210,7 @@ async function cloudflareJson(path, token, method = "GET", body = null) {
   return payload;
 }
 
-async function connectCloudflare(token) {
-  if (
-    typeof token !== "string" ||
-    token.length < 20 ||
-    token.length > 4096 ||
-    /\s/.test(token)
-  ) {
-    throw new HttpError(400, "Enter a valid Cloudflare API token.");
-  }
-
+async function cloudflareZone(token) {
   const zones = await cloudflareJson(
     `/zones?name=${encodeURIComponent(cloudflareZoneName)}&status=active`,
     token,
@@ -1233,16 +1224,74 @@ async function connectCloudflare(token) {
       `The token must grant access to the active ${cloudflareZoneName} zone.`,
     );
   }
-  await cloudflareJson(
-    `/zones/${encodeURIComponent(zones.result[0].id)}/dns_records?per_page=1`,
-    token,
-  );
-
-  const zoneId = zones.result[0].id;
-  const accountId = zones.result[0].account?.id;
-  if (!/^[a-f0-9]{32}$/i.test(accountId ?? "")) {
+  const zone = zones.result[0];
+  if (!/^[a-f0-9]{32}$/i.test(zone.account?.id ?? "")) {
     throw new HttpError(400, "Use an account-owned Cloudflare API token.");
   }
+  return { zoneId: zone.id, accountId: zone.account.id };
+}
+
+async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
+  const groups = await cloudflareJson(
+    `/accounts/${encodeURIComponent(accountId)}/tokens/permission_groups`,
+    bootstrapToken,
+  );
+  const required = ["Zone Read", "DNS Write"];
+  const permissionGroups = required.map((name) =>
+    groups.result?.find(
+      (group) =>
+        group.name === name &&
+        group.scopes?.includes("com.cloudflare.api.account.zone"),
+    ),
+  );
+  if (permissionGroups.some((group) => !/^[a-f0-9]{32}$/i.test(group?.id ?? ""))) {
+    throw new HttpError(
+      400,
+      "Cloudflare did not expose the required Zone Read and DNS Write permission groups.",
+    );
+  }
+  const expiresOn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const created = await cloudflareJson(
+    `/accounts/${encodeURIComponent(accountId)}/tokens`,
+    bootstrapToken,
+    "POST",
+    {
+      name: `pawprint-site-dns-${new Date().toISOString().slice(0, 10)}`,
+      expires_on: expiresOn,
+      policies: [
+        {
+          effect: "allow",
+          permission_groups: permissionGroups.map((group) => ({
+            id: group.id,
+            meta: {},
+          })),
+          resources: {
+            [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
+          },
+        },
+      ],
+    },
+  );
+  if (
+    !/^[a-f0-9]{32}$/i.test(created.result?.id ?? "") ||
+    typeof created.result?.value !== "string" ||
+    created.result.value.length < 20
+  ) {
+    throw new HttpError(400, "Cloudflare did not return a usable DNS token.");
+  }
+  return {
+    id: created.result.id,
+    value: created.result.value,
+    expiresOn: created.result.expires_on ?? expiresOn,
+  };
+}
+
+async function verifyCloudflareDnsToken(token) {
+  const { zoneId, accountId } = await cloudflareZone(token);
+  await cloudflareJson(
+    `/zones/${encodeURIComponent(zoneId)}/dns_records?per_page=1`,
+    token,
+  );
   const verification = await cloudflareJson(
     `/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
     token,
@@ -1253,9 +1302,6 @@ async function connectCloudflare(token) {
   ) {
     throw new HttpError(400, "The Cloudflare account token is not active.");
   }
-  const tokenExpiresOn = verification.result.expires_on
-    ? new Date(verification.result.expires_on).toISOString()
-    : "no-expiry";
   const probeName = `_pawprint-connect-${randomBytes(8).toString("hex")}.${cloudflareZoneName}`;
   const created = await cloudflareJson(
     `/zones/${encodeURIComponent(zoneId)}/dns_records`,
@@ -1266,7 +1312,7 @@ async function connectCloudflare(token) {
       name: probeName,
       content: "pawprint-connection-verification",
       ttl: 60,
-      comment: "Temporary Pawprint permission check",
+      comment: "Temporary PawPrint permission check",
     },
   );
   if (!/^[a-f0-9]{32}$/i.test(created.result?.id ?? "")) {
@@ -1277,7 +1323,13 @@ async function connectCloudflare(token) {
     token,
     "DELETE",
   );
+  return {
+    id: verification.result.id,
+    expiresOn: verification.result.expires_on ?? "no-expiry",
+  };
+}
 
+async function storeCloudflareDnsToken(token, verification) {
   for (const environment of cloudflareEnvironments) {
     await runWithInput(
       "gh",
@@ -1296,15 +1348,48 @@ async function connectCloudflare(token) {
       cloudflareRepository,
       environment,
       "CLOUDFLARE_TOKEN_ID",
-      verification.result.id,
+      verification.id,
     );
     await setGitHubEnvironmentVariable(
       cloudflareRepository,
       environment,
       "CLOUDFLARE_TOKEN_EXPIRES_ON",
-      tokenExpiresOn,
+      verification.expiresOn,
     );
   }
+}
+
+async function connectCloudflare(bootstrapToken) {
+  if (
+    typeof bootstrapToken !== "string" ||
+    bootstrapToken.length < 20 ||
+    bootstrapToken.length > 4096 ||
+    /\s/.test(bootstrapToken)
+  ) {
+    throw new HttpError(400, "Enter a valid temporary Cloudflare bootstrap token.");
+  }
+
+  const { accountId, zoneId } = await cloudflareZone(bootstrapToken);
+  let dnsToken = null;
+  try {
+    dnsToken = await createCloudflareDnsToken(
+      bootstrapToken,
+      accountId,
+      zoneId,
+    );
+    const verification = await verifyCloudflareDnsToken(dnsToken.value);
+    await storeCloudflareDnsToken(dnsToken.value, verification);
+  } catch (error) {
+    if (dnsToken) {
+      await cloudflareJson(
+        `/accounts/${encodeURIComponent(accountId)}/tokens/${encodeURIComponent(dnsToken.id)}`,
+        bootstrapToken,
+        "DELETE",
+      ).catch(() => null);
+    }
+    throw error;
+  }
+  return "Stored a new seven-day DNS-only token for Site dev and prod. Revoke the temporary bootstrap token in Cloudflare now.";
 }
 
 function openCloudflareAccountTokens() {
@@ -2221,9 +2306,9 @@ const server = createServer(async (request, response) => {
     ) {
       assertLocalPost(request);
       const body = await readBody(request);
-      await connectCloudflare(body.token);
+      const message = await connectCloudflare(body.token);
       sendJson(response, 200, {
-        message: `Cloudflare DNS access is connected for ${cloudflareRepository} dev and prod.`,
+        message,
       });
       return;
     }
