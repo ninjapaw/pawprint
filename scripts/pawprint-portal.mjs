@@ -52,6 +52,8 @@ const cloudflareZoneName = "ninjapaws.org";
 const cloudflareEnvironments = ["dev", "prod"];
 const cloudflareAccountTokenUrl =
   "https://dash.cloudflare.com/?to=/:account/api-tokens";
+const cloudflareAccountTokenCreateApiUrl =
+  "https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/create/";
 const edgePath =
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const setupPlanPath = join(root, ".pawprint-setup-plan.json");
@@ -154,6 +156,15 @@ async function optionalRun(name, args) {
   } catch {
     return null;
   }
+}
+
+function cloudflareErrorDetail(payload) {
+  return [payload?.errors, payload?.messages]
+    .flat()
+    .filter((entry) => typeof entry?.message === "string")
+    .map((entry) => entry.message.trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 async function azureManagementJson(path, options = {}) {
@@ -1202,9 +1213,12 @@ async function cloudflareJson(path, token, method = "GET", body = null) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success !== true) {
+    const detail = cloudflareErrorDetail(payload);
     throw new HttpError(
       400,
-      "Cloudflare rejected the token or its zone permissions.",
+      detail
+        ? `Cloudflare rejected the request: ${detail}`
+        : "Cloudflare rejected the token or its zone permissions.",
     );
   }
   return payload;
@@ -1291,7 +1305,9 @@ async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
   ).catch(() => {
     throw new HttpError(
       403,
-      "Cloudflare did not allow creation of the restricted DNS token. Confirm Account API Tokens Write and Super Administrator access for the bootstrap token creator.",
+      "Cloudflare did not allow creation of the restricted DNS token through " +
+        `${cloudflareAccountTokenCreateApiUrl}. Confirm Account API Tokens Write ` +
+        "and Super Administrator access for the bootstrap token creator.",
     );
   });
   if (

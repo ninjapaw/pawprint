@@ -55,7 +55,7 @@ import Disclaimer from "../../components/Disclaimer.astro";
           <div class="step-number">2</div>
           <div>
             <h2>Create, verify, and store the DNS token</h2>
-            <p>PawPrint uses the bootstrap token to create a new seven-day account token with only <strong>Zone Read</strong> and <strong>DNS Write</strong> for <strong>ninjapaws.org</strong>, verifies it with a temporary TXT probe, then sends only that new token over stdin to GitHub Environment secrets for Site development and production.</p>
+            <p>PawPrint uses Cloudflare's <a href="https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/create/" target="_blank" rel="noreferrer">Create Token API</a> to create a new seven-day account token with only <strong>Zone Read</strong> and <strong>DNS Write</strong> for <strong>ninjapaws.org</strong>, verifies it with a temporary TXT probe, then sends only that new token over stdin to GitHub Environment secrets for Site development and production.</p>
             <form class="guided-token-form" data-cloudflare-form>
               <label for="cloudflare-token"><KeyRound aria-hidden="true" size={16} /> Temporary bootstrap token</label>
               <div>
