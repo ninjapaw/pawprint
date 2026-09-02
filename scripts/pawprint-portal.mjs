@@ -50,6 +50,10 @@ const portalRepository = "ninjapaw/pawprint";
 const cloudflareRepository = "ninjapaw/site";
 const cloudflareZoneName = "ninjapaws.org";
 const cloudflareEnvironments = ["dev", "prod"];
+const cloudflareAccountTokenUrl =
+  "https://dash.cloudflare.com/?to=/:account/api-tokens";
+const edgePath =
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const setupPlanPath = join(root, ".pawprint-setup-plan.json");
 let azureManagementToken = null;
 const contentSecurityPolicy =
@@ -1303,6 +1307,21 @@ async function connectCloudflare(token) {
   }
 }
 
+function openCloudflareAccountTokens() {
+  if (!existsSync(edgePath)) {
+    throw new HttpError(
+      409,
+      "Microsoft Edge is not installed at its standard Windows location.",
+    );
+  }
+  const child = spawn(edgePath, [cloudflareAccountTokenUrl], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: false,
+  });
+  child.unref();
+}
+
 async function storePrivateKey(privateKey) {
   const userObjectId = await run("az", [
     "ad",
@@ -2205,6 +2224,17 @@ const server = createServer(async (request, response) => {
       await connectCloudflare(body.token);
       sendJson(response, 200, {
         message: `Cloudflare DNS access is connected for ${cloudflareRepository} dev and prod.`,
+      });
+      return;
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/setup/cloudflare/open-account-tokens"
+    ) {
+      assertLocalPost(request);
+      openCloudflareAccountTokens();
+      sendJson(response, 200, {
+        message: "Opened Cloudflare account token setup in Microsoft Edge.",
       });
       return;
     }

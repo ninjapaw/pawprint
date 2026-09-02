@@ -3,6 +3,7 @@ const statusList = document.querySelector("[data-cloudflare-status]");
 const message = document.querySelector("[data-cloudflare-message]");
 const deployButton = document.querySelector("[data-cloudflare-deploy]");
 const result = document.querySelector("[data-connector-result]");
+const openCloudflareButton = document.querySelector("[data-open-cloudflare]");
 
 function statusRow(label, value) {
   const row = document.createElement("div");
@@ -71,6 +72,27 @@ form.addEventListener("submit", async (event) => {
   } finally {
     token.value = "";
     button.disabled = false;
+  }
+});
+
+openCloudflareButton.addEventListener("click", async () => {
+  openCloudflareButton.disabled = true;
+  message.textContent =
+    "Opening Cloudflare account token setup in Microsoft Edge...";
+  try {
+    const response = await fetch("/api/setup/cloudflare/open-account-tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const payload = await response.json();
+    if (!response.ok)
+      throw new Error(payload.error ?? "Could not open Cloudflare.");
+    message.textContent = payload.message;
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    openCloudflareButton.disabled = false;
   }
 });
 

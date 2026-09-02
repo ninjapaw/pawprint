@@ -646,6 +646,14 @@ h1 em {
   cursor: pointer;
   font-weight: 700;
 }
+.provider-fallback {
+  display: inline-block;
+  margin-left: 15px;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
 .guided-token-form label {
   display: flex;
   align-items: center;
@@ -1516,6 +1524,12 @@ footer {
   .guided-token-form button,
   .deploy-action {
     width: 100%;
+  }
+  .provider-fallback {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin: 14px 0 0;
   }
   .platform-main {
     padding-top: 38px;

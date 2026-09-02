@@ -46,7 +46,8 @@ import Disclaimer from "../../components/Disclaimer.astro";
           <div>
             <h2>Create a service token</h2>
             <p>In Cloudflare, create an account-owned API token scoped only to <strong>ninjapaws.org</strong>. Grant <strong>Zone Read</strong> and <strong>DNS Write</strong>. No account settings, Workers, TLS, WAF, or global API key.</p>
-            <a class="step-action" href="https://dash.cloudflare.com/" target="_blank" rel="noreferrer">Open Cloudflare <ExternalLink aria-hidden="true" size={16} /></a>
+            <button type="button" class="step-action" data-open-cloudflare>Open Cloudflare in Edge <ExternalLink aria-hidden="true" size={16} /></button>
+            <a class="provider-fallback" href="https://dash.cloudflare.com/?to=/:account/api-tokens" target="_blank" rel="noreferrer">Open in this browser instead</a>
           </div>
         </li>
 
