@@ -140,10 +140,6 @@
       "title": "Cloudflare DNS",
       "description": "Verifies and reconciles only the DNS records required to bind an Azure-hosted application to a Cloudflare-managed domain.",
       "identity": "cloudflare-api-token",
-      "detect": {
-        "method": "cloudflare-api",
-        "probe": "https://api.cloudflare.com/client/v4/user/tokens/verify"
-      },
       "tiers": {
         "none": {
           "summary": "No Cloudflare access. Custom-domain DNS remains manual.",
