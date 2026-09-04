@@ -49,7 +49,7 @@ on:
         default: true
     secrets:
       AZURE_STATIC_WEB_APPS_API_TOKEN:
-        required: true
+        required: false
     outputs:
       environment:
         value: ${{ jobs.resolve-environment.outputs.environment }}
@@ -165,7 +165,7 @@ jobs:
       - name: Verify Static Web Apps deployment token
         env:
           AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-        run: ': "${AZURE_STATIC_WEB_APPS_API_TOKEN:?Set this secret after provisioning the Static Web App}"'
+        run: ': "${AZURE_STATIC_WEB_APPS_API_TOKEN:?Set this environment secret after provisioning the Static Web App}"'
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
