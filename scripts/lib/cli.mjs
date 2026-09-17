@@ -12,7 +12,8 @@ import { execFileSync } from "node:child_process";
 
 const WINDOWS = process.platform === "win32";
 // az ships as a .cmd shim on Windows, which execFile cannot resolve on its own.
-export const binary = (command) => (WINDOWS && command === "az" ? "az.cmd" : command);
+export const binary = (command) =>
+  WINDOWS && command === "az" ? "az.cmd" : command;
 // A shell concatenates rather than escapes, so anything containing a space has
 // to carry its own quotes.
 const quoted = (argument) =>

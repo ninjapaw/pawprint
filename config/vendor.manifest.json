@@ -7,6 +7,10 @@
       "description": "Resolves config/deploy.config.json into deployment environment variables."
     },
     {
+      "path": "scripts/github-oidc-subject.mjs",
+      "description": "Builds the ID-qualified GitHub Actions OIDC federated-credential subject. The one string every repo's OIDC bootstrap must agree on byte-for-byte, or the trust relationship simply never matches."
+    },
+    {
       "path": "scripts/validate-environment.sh",
       "description": "Fails on malformed deployment variables before any Azure call is made."
     },
