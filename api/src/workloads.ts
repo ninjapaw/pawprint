@@ -47,9 +47,17 @@ export const workloads: Readonly<Record<string, Workload>> = {
     steps: {
       // Scenario 1 (NGINX CVE / App Service + ACR) — scripts/deploy.sh via deploy.yml.
       application: { workflow: "deploy.yml", inputs: { stage: "full" } },
+      // Reuses the repo's existing dedicated, exact-name-confirmed uninstall.yml rather than
+      // adding a second, less-guarded uninstall path to deploy.yml. Note this ALSO clears the
+      // repo's GitHub Environment variables (AZURE_CLIENT_ID etc.), so a redeploy after this
+      // needs scripts/setup-azure-github-oidc.sh re-run before the "Deploy" button works again.
       "scenario1-uninstall": {
-        workflow: "deploy.yml",
-        inputs: { stage: "uninstall" },
+        workflow: "uninstall.yml",
+        inputs: {
+          environment: "dev",
+          confirm_resource_group: "NP-ninjapaws-dojo-Dev-CentralUS",
+          no_wait: "false",
+        },
       },
       // Scenario 2 (SQL Server on Azure VM) is a separate architecture with its own
       // workflow — scripts/deploy-sql-scenario.sh via deploy-sql-scenario.yml.
@@ -59,7 +67,11 @@ export const workloads: Readonly<Record<string, Workload>> = {
       },
       "scenario2-uninstall": {
         workflow: "deploy-sql-scenario.yml",
-        inputs: { stage: "uninstall", environment: "dev" },
+        inputs: {
+          stage: "uninstall",
+          environment: "dev",
+          confirm_resource_group: "NP-ninjapaws-dojo-sql-Dev-CentralUS",
+        },
       },
     },
   },

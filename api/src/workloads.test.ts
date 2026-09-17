@@ -19,7 +19,14 @@ describe("workflow allowlist", () => {
       resolveWorkflow("ninjapaws-cloud-security-dojo", "scenario1-uninstall"),
     ).toEqual({
       repository: "ninjapaw/ninjapaws-cloud-security-dojo",
-      workflow: { workflow: "deploy.yml", inputs: { stage: "uninstall" } },
+      workflow: {
+        workflow: "uninstall.yml",
+        inputs: {
+          environment: "dev",
+          confirm_resource_group: "NP-ninjapaws-dojo-Dev-CentralUS",
+          no_wait: "false",
+        },
+      },
     });
     expect(
       resolveWorkflow("ninjapaws-cloud-security-dojo", "scenario2-deploy"),
@@ -36,7 +43,11 @@ describe("workflow allowlist", () => {
       repository: "ninjapaw/ninjapaws-cloud-security-dojo",
       workflow: {
         workflow: "deploy-sql-scenario.yml",
-        inputs: { stage: "uninstall", environment: "dev" },
+        inputs: {
+          stage: "uninstall",
+          environment: "dev",
+          confirm_resource_group: "NP-ninjapaws-dojo-sql-Dev-CentralUS",
+        },
       },
     });
   });
