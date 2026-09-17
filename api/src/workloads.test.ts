@@ -13,4 +13,31 @@ describe("workflow allowlist", () => {
     expect(resolveWorkflow("site", "../../arbitrary.yml")).toBeNull();
     expect(resolveWorkflow("unknown", "application")).toBeNull();
   });
+
+  it("resolves the dojo's per-scenario deploy and uninstall actions", () => {
+    expect(
+      resolveWorkflow("ninjapaws-cloud-security-dojo", "scenario1-uninstall"),
+    ).toEqual({
+      repository: "ninjapaw/ninjapaws-cloud-security-dojo",
+      workflow: { workflow: "deploy.yml", inputs: { stage: "uninstall" } },
+    });
+    expect(
+      resolveWorkflow("ninjapaws-cloud-security-dojo", "scenario2-deploy"),
+    ).toEqual({
+      repository: "ninjapaw/ninjapaws-cloud-security-dojo",
+      workflow: {
+        workflow: "deploy-sql-scenario.yml",
+        inputs: { stage: "deploy", environment: "dev" },
+      },
+    });
+    expect(
+      resolveWorkflow("ninjapaws-cloud-security-dojo", "scenario2-uninstall"),
+    ).toEqual({
+      repository: "ninjapaw/ninjapaws-cloud-security-dojo",
+      workflow: {
+        workflow: "deploy-sql-scenario.yml",
+        inputs: { stage: "uninstall", environment: "dev" },
+      },
+    });
+  });
 });

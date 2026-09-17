@@ -358,6 +358,7 @@ h1 em {
 }
 .card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .card-actions button,
@@ -377,6 +378,14 @@ h1 em {
 .card-actions button:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+.card-actions button.danger {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+.card-actions button.danger:hover {
+  background: var(--coral);
+  color: var(--surface);
 }
 .run-time {
   color: var(--muted);

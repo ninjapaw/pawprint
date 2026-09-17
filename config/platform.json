@@ -83,14 +83,26 @@
         "dev": {
           "resourceGroup": "NP-ninjapaws-dojo-Dev-CentralUS",
           "infrastructureApp": "ninjapaws-cloud-security-dojo-dev-github",
-          "rbacAdmin": true
+          "rbacAdmin": true,
+          "additionalResourceGroups": [
+            {
+              "resourceGroup": "NP-ninjapaws-dojo-sql-Dev-CentralUS",
+              "label": "Scenario 2: SQL Server on Azure VM"
+            }
+          ]
         },
         "prod": {
           "resourceGroup": "NP-ninjapaws-dojo-Prod-CentralUS",
           "subscriptionRef": "dev",
           "infrastructureApp": "ninjapaws-cloud-security-dojo-prod-github",
           "rbacAdmin": true,
-          "note": "Production runs in the development subscription. Deliberate for a training environment that must never share a subscription with production workloads, but it means prod here is not the prod subscription."
+          "note": "Production runs in the development subscription. Deliberate for a training environment that must never share a subscription with production workloads, but it means prod here is not the prod subscription.",
+          "additionalResourceGroups": [
+            {
+              "resourceGroup": "NP-ninjapaws-dojo-sql-Prod-CentralUS",
+              "label": "Scenario 2: SQL Server on Azure VM"
+            }
+          ]
         }
       }
     }

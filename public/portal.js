@@ -30,6 +30,24 @@ function safeUrl(value) {
   }
 }
 
+// Human-readable labels for the growing set of per-scenario management steps (deploy vs.
+// uninstall, scenario 1 vs. scenario 2), falling back to a generic label for future steps.
+const HOSTED_STEP_LABELS = {
+  infrastructure: "Infrastructure",
+  application: "Deploy",
+  "scenario1-uninstall": "Uninstall Scenario 1",
+  "scenario2-deploy": "Deploy Scenario 2",
+  "scenario2-uninstall": "Uninstall Scenario 2",
+};
+
+function hostedStepLabel(step) {
+  return HOSTED_STEP_LABELS[step] ?? "Deploy";
+}
+
+function isDestructiveStep(step) {
+  return step.endsWith("-uninstall") || step === "uninstall";
+}
+
 function render(data) {
   const states = data.workloads.map((item) =>
     item.job?.status === "running"
@@ -69,7 +87,7 @@ function render(data) {
           <a href="${escapeHtml(safeUrl(item.siteUrl))}" target="_blank" rel="noreferrer">Open site</a>
           ${item.run?.url ? `<a href="${escapeHtml(safeUrl(item.run.url))}" target="_blank" rel="noreferrer">View</a>` : ""}
           ${data.localController ? `<button type="button" data-action="${escapeHtml(item.action)}">Deploy</button>` : ""}
-          ${data.hostedAdmin && data.githubAppConfigured ? (item.steps ?? []).map((step) => `<button type="button" data-hosted-workload="${escapeHtml(item.id)}" data-hosted-step="${escapeHtml(step)}">${step === "infrastructure" ? "Infrastructure" : "Deploy"}</button>`).join("") : ""}
+          ${data.hostedAdmin && data.githubAppConfigured ? (item.steps ?? []).map((step) => `<button type="button" class="${isDestructiveStep(step) ? "danger" : ""}" data-hosted-workload="${escapeHtml(item.id)}" data-hosted-step="${escapeHtml(step)}">${escapeHtml(hostedStepLabel(step))}</button>`).join("") : ""}
           ${!data.localController && !(data.hostedAdmin && data.githubAppConfigured) ? `<a href="${escapeHtml(safeUrl(item.actionsUrl))}" target="_blank" rel="noreferrer">Actions</a>` : ""}
         </div>
       </div>
@@ -329,7 +347,11 @@ async function runAction(action, button) {
 }
 
 async function runHostedAction(workload, step, button) {
-  if (!confirm(`Deploy ${workload} ${step} to development?`)) return;
+  const label = hostedStepLabel(step);
+  const prompt = isDestructiveStep(step)
+    ? `This will PERMANENTLY DELETE the ${workload} ${label} resource group in development. Continue?`
+    : `Run ${workload} ${label} in development?`;
+  if (!confirm(prompt)) return;
   button.disabled = true;
   try {
     const response = await fetch("/api/actions/dispatch", {

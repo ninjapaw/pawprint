@@ -242,6 +242,28 @@ for (const [name, repository] of Object.entries(manifest.repositories ?? {})) {
     );
   }
 
+  for (const additional of declared.additionalResourceGroups ?? []) {
+    if (
+      run("az", [
+        "group",
+        "exists",
+        "--name",
+        additional.resourceGroup,
+        "--subscription",
+        repositorySubscription,
+      ]) === "true"
+    ) {
+      ok(
+        `resource group ${additional.resourceGroup}` +
+          (additional.label ? ` (${additional.label})` : ``),
+      );
+    } else {
+      gap(
+        `resource group ${additional.resourceGroup}${additional.label ? ` (${additional.label})` : ""} does not exist in the ${declared.subscriptionRef ?? environmentName} subscription`,
+      );
+    }
+  }
+
   const ghEnvironment = ghJson(
     `repos/${organisation}/${name}/environments/${environmentName}`,
   );
@@ -382,8 +404,16 @@ function checkApplication(
   // Listed across the subscription and filtered by prefix: a role scoped to a
   // single resource inside the group, which is what a well-scoped workload
   // identity looks like, does not appear when querying the group scope.
-  const groupScope = `/subscriptions/${repositorySubscription}/resourceGroups/${declared.resourceGroup}`;
-  const assignments = JSON.parse(
+  // Includes any additional resource groups declared for this repo/environment
+  // (e.g. a second scenario's resource group sharing the same OIDC identity).
+  const groupScopes = [
+    `/subscriptions/${repositorySubscription}/resourceGroups/${declared.resourceGroup}`,
+    ...(declared.additionalResourceGroups ?? []).map(
+      (additional) =>
+        `/subscriptions/${repositorySubscription}/resourceGroups/${additional.resourceGroup}`,
+    ),
+  ];
+  const allAssignments = JSON.parse(
     run("az", [
       "role",
       "assignment",
@@ -398,28 +428,33 @@ function checkApplication(
       "-o",
       "json",
     ]) ?? "[]",
-  ).filter((assignment) =>
-    assignment.scope.toLowerCase().startsWith(groupScope.toLowerCase()),
   );
 
-  if (assignments.length === 0) {
-    // A documented reason means the absence is understood and owed a decision,
-    // not an oversight to be closed by handing out a role.
-    const documented = declared[`${kind}Note`];
-    if (documented) {
-      undecided(`${kind} identity holds no roles: ${documented}`);
-    } else {
-      gap(
-        `${kind} identity holds no roles on ${declared.resourceGroup}; deployments would fail on the first call`,
-      );
-    }
-  } else {
-    const described = assignments.map((assignment) =>
-      assignment.scope.toLowerCase() === groupScope.toLowerCase()
-        ? assignment.role
-        : `${assignment.role} (on ${assignment.scope.split("/").pop()})`,
+  for (const groupScope of groupScopes) {
+    const assignments = allAssignments.filter((assignment) =>
+      assignment.scope.toLowerCase().startsWith(groupScope.toLowerCase()),
     );
-    ok(`${kind} roles: ${described.join(", ")}`);
+    const groupLabel = groupScope.split("/").pop();
+
+    if (assignments.length === 0) {
+      // A documented reason means the absence is understood and owed a decision,
+      // not an oversight to be closed by handing out a role.
+      const documented = declared[`${kind}Note`];
+      if (documented) {
+        undecided(`${kind} identity holds no roles: ${documented}`);
+      } else {
+        gap(
+          `${kind} identity holds no roles on ${groupLabel}; deployments would fail on the first call`,
+        );
+      }
+    } else {
+      const described = assignments.map((assignment) =>
+        assignment.scope.toLowerCase() === groupScope.toLowerCase()
+          ? assignment.role
+          : `${assignment.role} (on ${assignment.scope.split("/").pop()})`,
+      );
+      ok(`${kind} roles on ${groupLabel}: ${described.join(", ")}`);
+    }
   }
 }
 

@@ -45,7 +45,22 @@ export const workloads: Readonly<Record<string, Workload>> = {
   "ninjapaws-cloud-security-dojo": {
     repository: "ninjapaw/ninjapaws-cloud-security-dojo",
     steps: {
+      // Scenario 1 (NGINX CVE / App Service + ACR) — scripts/deploy.sh via deploy.yml.
       application: { workflow: "deploy.yml", inputs: { stage: "full" } },
+      "scenario1-uninstall": {
+        workflow: "deploy.yml",
+        inputs: { stage: "uninstall" },
+      },
+      // Scenario 2 (SQL Server on Azure VM) is a separate architecture with its own
+      // workflow — scripts/deploy-sql-scenario.sh via deploy-sql-scenario.yml.
+      "scenario2-deploy": {
+        workflow: "deploy-sql-scenario.yml",
+        inputs: { stage: "deploy", environment: "dev" },
+      },
+      "scenario2-uninstall": {
+        workflow: "deploy-sql-scenario.yml",
+        inputs: { stage: "uninstall", environment: "dev" },
+      },
     },
   },
 };

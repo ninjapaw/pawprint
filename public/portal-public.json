@@ -34,7 +34,12 @@
       "repository": "ninjapaw/ninjapaws-cloud-security-dojo",
       "siteUrl": "https://ninjapaws-dojo-app-dev.azurewebsites.net/",
       "statusWorkflow": "deploy.yml",
-      "steps": ["application"]
+      "steps": [
+        "application",
+        "scenario1-uninstall",
+        "scenario2-deploy",
+        "scenario2-uninstall"
+      ]
     }
   ]
 }
