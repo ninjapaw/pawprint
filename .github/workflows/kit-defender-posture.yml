@@ -38,6 +38,18 @@ on:
       defender-arm-tier:
         type: string
         default: Standard
+      defender-servers-tier:
+        description: Defender for Servers plan tier for VMs (e.g. Standard or disabled). Opt in per consumer.
+        type: string
+        default: disabled
+      defender-servers-subplan:
+        description: Defender for Servers sub-plan (P1 or P2) when defender-servers-tier is Standard.
+        type: string
+        default: P2
+      defender-sql-tier:
+        description: Defender for SQL on Azure VMs plan tier (e.g. Standard or disabled). Opt in per consumer.
+        type: string
+        default: disabled
       defender-cspm-agentless-serverless-posture:
         type: string
         default: "true"
@@ -104,6 +116,9 @@ jobs:
       DEFENDER_CONTAINERS_TIER: ${{ inputs.defender-containers-tier }}
       DEFENDER_CSPM_TIER: ${{ inputs.defender-cspm-tier }}
       DEFENDER_ARM_TIER: ${{ inputs.defender-arm-tier }}
+      DEFENDER_SERVERS_TIER: ${{ inputs.defender-servers-tier }}
+      DEFENDER_SERVERS_SUBPLAN: ${{ inputs.defender-servers-subplan }}
+      DEFENDER_SQL_TIER: ${{ inputs.defender-sql-tier }}
       DEFENDER_CSPM_AGENTLESS_SERVERLESS_POSTURE: ${{ inputs.defender-cspm-agentless-serverless-posture }}
       DEFENDER_CSPM_SERVERLESS_CONTAINERS: ${{ inputs.defender-cspm-serverless-containers }}
       DEFENDER_CSPM_REGISTRY_ASSESSMENT: ${{ inputs.defender-cspm-registry-assessment }}
@@ -162,6 +177,10 @@ jobs:
             az security pricing show --name "$1" --query pricingTier -o tsv 2>/dev/null || true
           }
 
+          plan_subplan() {
+            az security pricing show --name "$1" --query subPlan -o tsv 2>/dev/null || true
+          }
+
           extension_state() {
             local value
             value="$(az security pricing show --name "$1" --query "extensions[?name=='$2'].isEnabled | [0]" -o tsv 2>/dev/null || true)"
@@ -173,24 +192,27 @@ jobs:
           }
 
           ensure_plan() {
-            local plan="$1" desired="$2" label="$3" current
+            local plan="$1" desired="$2" label="$3" desired_subplan="${4:-}" current current_subplan extra_args=()
             if [[ "$desired" == disabled || "$desired" == off ]]; then
               add_row "$label" 'Skipped' 'Disabled by configuration.'
               return
             fi
             current="$(plan_tier "$plan")"
-            if [[ "$current" == "$desired" ]]; then
-              add_row "$label" 'Pass' "Already $desired; enablement skipped and state audited."
+            [[ -z "$desired_subplan" ]] || current_subplan="$(plan_subplan "$plan")"
+            if [[ "$current" == "$desired" ]] && { [[ -z "$desired_subplan" ]] || [[ "$current_subplan" == "$desired_subplan" ]]; }; then
+              add_row "$label" 'Pass' "Already $desired${desired_subplan:+/$desired_subplan}; enablement skipped and state audited."
               return
             fi
             if truthy "$APPLY"; then
-              az security pricing create --name "$plan" --tier "$desired" --output none
+              [[ -z "$desired_subplan" ]] || extra_args+=(--sub-plan "$desired_subplan")
+              az security pricing create --name "$plan" --tier "$desired" "${extra_args[@]}" --output none
               current="$(plan_tier "$plan")"
+              [[ -z "$desired_subplan" ]] || current_subplan="$(plan_subplan "$plan")"
             fi
-            if [[ "$current" == "$desired" ]]; then
-              add_row "$label" 'Pass' "Azure reports $desired."
+            if [[ "$current" == "$desired" ]] && { [[ -z "$desired_subplan" ]] || [[ "$current_subplan" == "$desired_subplan" ]]; }; then
+              add_row "$label" 'Pass' "Azure reports $desired${current_subplan:+/$current_subplan}."
             else
-              add_row "$label" 'Fail' "Azure reports ${current:-unknown}; expected $desired."
+              add_row "$label" 'Fail' "Azure reports ${current:-unknown}${desired_subplan:+/${current_subplan:-unknown}}; expected $desired${desired_subplan:+/$desired_subplan}."
               failures=$((failures + 1))
             fi
           }
@@ -237,6 +259,8 @@ jobs:
           ensure_plan Containers "$DEFENDER_CONTAINERS_TIER" 'Defender for Containers'
           ensure_plan CloudPosture "$DEFENDER_CSPM_TIER" 'Defender CSPM'
           ensure_plan Arm "$DEFENDER_ARM_TIER" 'Defender for Resource Manager'
+          ensure_plan VirtualMachines "$DEFENDER_SERVERS_TIER" 'Defender for Servers' "$DEFENDER_SERVERS_SUBPLAN"
+          ensure_plan SqlServerVirtualMachines "$DEFENDER_SQL_TIER" 'Defender for SQL (Azure VMs)'
 
           cspm_spec="$(cat <<EOF
           AgentlessServerlessPosture=$DEFENDER_CSPM_AGENTLESS_SERVERLESS_POSTURE
