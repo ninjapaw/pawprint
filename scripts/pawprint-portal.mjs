@@ -1256,7 +1256,10 @@ async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
     );
   });
   if (verification.result?.status !== "active") {
-    throw new HttpError(400, "The temporary Cloudflare bootstrap token is not active.");
+    throw new HttpError(
+      400,
+      "The temporary Cloudflare bootstrap token is not active.",
+    );
   }
   const groups = await cloudflareJson(
     `/accounts/${encodeURIComponent(accountId)}/tokens/permission_groups`,
@@ -1275,13 +1278,17 @@ async function createCloudflareDnsToken(bootstrapToken, accountId, zoneId) {
         group.scopes?.includes("com.cloudflare.api.account.zone"),
     ),
   );
-  if (permissionGroups.some((group) => !/^[a-f0-9]{32}$/i.test(group?.id ?? ""))) {
+  if (
+    permissionGroups.some((group) => !/^[a-f0-9]{32}$/i.test(group?.id ?? ""))
+  ) {
     throw new HttpError(
       400,
       "Cloudflare did not expose the required Zone Read and DNS Write permission groups.",
     );
   }
-  const expiresOn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresOn = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
   const created = await cloudflareJson(
     `/accounts/${encodeURIComponent(accountId)}/tokens`,
     bootstrapToken,
@@ -1404,7 +1411,10 @@ async function connectCloudflare(bootstrapToken) {
     bootstrapToken.length > 4096 ||
     /\s/.test(bootstrapToken)
   ) {
-    throw new HttpError(400, "Enter a valid temporary Cloudflare bootstrap token.");
+    throw new HttpError(
+      400,
+      "Enter a valid temporary Cloudflare bootstrap token.",
+    );
   }
 
   const { accountId, zoneId } = await cloudflareZone(bootstrapToken);

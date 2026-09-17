@@ -92,11 +92,17 @@ test("fits the viewport without horizontal overflow", async ({ page }) => {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 });
 
-test("offers Entra and GitHub only as invited operator identities", async ({ page }) => {
+test("offers Entra and GitHub only as invited operator identities", async ({
+  page,
+}) => {
   await page.goto("/login/");
-  await expect(page.getByRole("heading", { name: "Choose your identity." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Continue with Microsoft Entra" }))
-    .toHaveAttribute("href", "/.auth/login/aad?post_login_redirect_uri=/");
-  await expect(page.getByRole("link", { name: "Continue with GitHub" }))
-    .toHaveAttribute("href", "/.auth/login/github?post_login_redirect_uri=/");
+  await expect(
+    page.getByRole("heading", { name: "Choose your identity." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Continue with Microsoft Entra" }),
+  ).toHaveAttribute("href", "/.auth/login/aad?post_login_redirect_uri=/");
+  await expect(
+    page.getByRole("link", { name: "Continue with GitHub" }),
+  ).toHaveAttribute("href", "/.auth/login/github?post_login_redirect_uri=/");
 });
