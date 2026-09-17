@@ -21,13 +21,14 @@
  * Defaults to a dry run. Pass --apply to make changes.
  */
 
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { binary, run as sharedRun } from "./lib/cli.mjs";
 import { githubEnvironmentSubject } from "./github-oidc-subject.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -112,27 +113,13 @@ function fail(message) {
   process.exit(1);
 }
 
-// az ships as a .cmd shim on Windows, which execFile cannot resolve on its own.
-const WINDOWS = process.platform === "win32";
-const binary = (command) => (WINDOWS && command === "az" ? "az.cmd" : command);
-
-// A shell concatenates rather than escapes, so anything containing a space has
-// to carry its own quotes. Every value reaching here is validated above.
-const quoted = (argument) =>
-  WINDOWS && /\s/.test(argument) ? `"${argument}"` : argument;
-
-function run(command, args, { allowFailure = false } = {}) {
+// Thin wrapper: shared run() throws on failure, this script's convention is to
+// print a clean message and exit rather than let a stack trace leak out.
+function run(command, args, options) {
   try {
-    return execFileSync(binary(command), WINDOWS ? args.map(quoted) : args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: WINDOWS,
-    }).trim();
+    return sharedRun(command, args, options);
   } catch (error) {
-    if (allowFailure) {
-      return null;
-    }
-    fail(`${command} ${args.join(" ")}\n${error.stderr ?? error.message}`);
+    fail(error.message);
   }
 }
 

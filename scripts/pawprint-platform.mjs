@@ -14,16 +14,15 @@
  * Read-only. Nothing here changes anything; pawprint-onboard.mjs does that.
  */
 
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { githubEnvironmentSubject } from "./github-oidc-subject.mjs";
+import { run as sharedRun } from "./lib/cli.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = join(REPO_ROOT, "config", "platform.json");
-const WINDOWS = process.platform === "win32";
 
 const { values } = parseArgs({
   options: {
@@ -82,19 +81,7 @@ function fail(message) {
 }
 
 function run(command, args) {
-  try {
-    return execFileSync(
-      WINDOWS && command === "az" ? "az.cmd" : command,
-      args,
-      {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        shell: WINDOWS,
-      },
-    ).trim();
-  } catch {
-    return null;
-  }
+  return sharedRun(command, args, { allowFailure: true });
 }
 
 const ok = (message) => process.stdout.write(`  ok       ${message}\n`);

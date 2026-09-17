@@ -77,11 +77,16 @@ export const workloads: Readonly<Record<string, Workload>> = {
   },
 };
 
-export function resolveWorkflow(workloadId: string, stepId: string): {
+export function resolveWorkflow(
+  workloadId: string,
+  stepId: string,
+): {
   repository: string;
   workflow: WorkflowStep;
 } | null {
   const workload = workloads[workloadId];
   const workflow = workload?.steps[stepId];
-  return workload && workflow ? { repository: workload.repository, workflow } : null;
+  return workload && workflow
+    ? { repository: workload.repository, workflow }
+    : null;
 }
