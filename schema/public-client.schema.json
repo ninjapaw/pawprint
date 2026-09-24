@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ninjapaw.dev/pawprint/schema/public-client.schema.json",
+  "title": "Publisher-owned multitenant public client",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "key",
+    "displayName",
+    "description",
+    "redirectUris",
+    "permissions",
+    "info"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "key": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "redirectUris": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^http://localhost:[0-9]{1,5}(/)?$"
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceAppId", "scopes"],
+        "properties": {
+          "resourceAppId": { "type": "string", "format": "uuid" },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,100}$"
+            }
+          }
+        }
+      }
+    },
+    "info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "marketingUrl",
+        "privacyStatementUrl",
+        "termsOfServiceUrl",
+        "supportUrl"
+      ],
+      "properties": {
+        "marketingUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "privacyStatementUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "termsOfServiceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "supportUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        }
+      }
+    }
+  }
+}

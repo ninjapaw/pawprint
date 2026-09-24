@@ -115,6 +115,26 @@ Environment variables, not repository files or long-lived client secrets.
 
 ## Identity and permissions
 
+### Shared public-client publisher registration
+
+[scripts/publisher-public-client.mjs](scripts/publisher-public-client.mjs) provisions a publisher-owned multitenant desktop app from a consumer-owned manifest validated by [schema/public-client.schema.json](schema/public-client.schema.json). It is separate from Pawprint's portal/admin identity. Entra applications are directory objects: this uses a declarative manifest and Microsoft Graph reconciliation, not a resource-group Bicep deployment. No hosted resources, Azure RBAC, client secrets, application permissions, or tenant-wide consent grants are created.
+
+From a Pawprint checkout with dependencies installed, supply the consuming project's manifest:
+
+```powershell
+node scripts/publisher-public-client.mjs validate --config ../committer-insights/infra/publisher/public-client.json
+node scripts/publisher-public-client.mjs plan --config ../committer-insights/infra/publisher/public-client.json --tenant <publisher-tenant-id>
+node scripts/publisher-public-client.mjs apply --config ../committer-insights/infra/publisher/public-client.json --tenant <publisher-tenant-id> --yes
+```
+
+`validate` is offline. `plan` performs reads only. `apply` requires an explicit tenant matching the active Azure CLI context and `--yes`; review the plan first. Only the publisher/operator needs Azure CLI and application-management permission. Customers do not. Graph credentials remain in process memory and are never printed or persisted.
+
+The manifest declares names, loopback redirects, consent URLs and delegated scope names. Scope IDs are resolved from live resource service-principal metadata, with no broad-scope fallback. A stable `pawprint-public-client:<key>` tag identifies managed apps; duplicate tags, unmanaged name collisions, unexpected permissions or confidential-client settings stop the operation. Keep the key stable. Apply reads the object back to verify its desired state; repeat apply returns `found` without writes. Do not run concurrent applies for the same key. After an interrupted create, rerun plan and allow Graph replication to settle before retrying.
+
+The resulting public `clientId` is build configuration, not a secret. Record it through the consuming repository's release configuration after reviewing the observed output. Publisher verification/domain/logo, assignment of appropriate app owners, user/admin consent, and live cross-tenant testing remain explicit publisher duties. No deletion or consent revocation is automated; rollback means reviewing the plan for a prior manifest, or manually deleting the exact managed application after assessing affected users.
+
+Run `npm run test:public-client` for negative-path, read-only planning, read-back, and two-run idempotency tests. `npm test` includes this suite.
+
 Pawprint has three separate planes:
 
 | Plane                     | Default posture                                                     |
