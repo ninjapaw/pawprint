@@ -252,6 +252,89 @@ platform baseline creates one tagged run resource group, then the scenario is
 deployed at resource-group scope. Bicep parameter files (`.bicepparam`) are
 preferred because they are type-checked.
 
+### Container image source and inspection
+
+The [NGINX scenario](samples/defender-appservice-nginx-cve.scenario.json) is a
+reference manifest, not a Docker build context. Its executable image definition
+lives in [Cloud Security Dojo](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo).
+Pawprint's [App Service module](modules/container-app-service/main.bicep) deploys
+an image supplied by its caller; it does not build one. Keep the Docker files
+in the workload repository rather than maintaining a second, drifting copy here.
+
+These source links are pinned to reviewed commit
+[`7a6d8fb`](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/commit/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9).
+They describe that snapshot, not necessarily a currently deployed image. For a
+particular deployment, inspect the source commit recorded by that run; for
+ongoing development, see the [Dojo dev branch](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/tree/dev).
+
+| Source | What it tells you |
+| ------ | ----------------- |
+| [Dockerfile](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/Dockerfile) | Base OS, installed packages, build arguments, copied files, environment, ports, health check, and entrypoint |
+| [.dockerignore](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/.dockerignore) and [package-lock.json](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/package-lock.json) | Build-context exclusions and locked npm dependencies |
+| [docker-compose.yml](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/docker-compose.yml) | Local build overrides, environment, published ports, and health check |
+| [entrypoint.sh](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/entrypoint.sh) and [nginx.conf](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/nginx.conf) | Startup-generated configuration, runtime evidence, and NGINX-to-Node reverse proxy |
+| [src/app.js](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/src/app.js) | Rendered dashboard and the health, build-evidence, and runtime-status endpoints |
+| [deploy.yml](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/.github/workflows/deploy.yml) and [scripts/deploy.sh](https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/scripts/deploy.sh) | Resolved build arguments, fingerprint-based reuse, remote `az acr build`, registry tags, and image digest |
+
+At this snapshot, the Dockerfile defaults to Ubuntu 24.04, NGINX 1.30.3, and
+Node.js 24. It installs production npm dependencies under `/app` and copies the
+application, NGINX template, entrypoint, and verification script. At startup,
+NGINX listens on port 80 and proxies to Node on `PORT` (default 3000).
+Check the actual build arguments: Compose, for example, overrides the Node
+major version to 20 by default.
+
+A Dockerfile is the **recipe**, not proof of the exact resulting bytes. Base
+image tags and package repositories can change between builds. The build
+fingerprint is a reuse key, not the registry digest. Use an immutable
+`registry/repository@sha256:...` reference from the real run, not `latest` or
+the illustrative digest in [example.pawprint.json](samples/example.pawprint.json).
+For multi-platform images, also record the selected platform manifest digest.
+
+With Docker running Linux containers, authenticate to the registry if required,
+then inspect the real image without starting it:
+
+```powershell
+$image = '<registry>/<repository>@sha256:<digest-from-the-real-run>'
+docker pull $image
+docker image inspect $image
+docker history --no-trunc $image
+```
+
+Inspection shows OS/architecture, image configuration, and layer identifiers.
+History helps explain layers but cannot recover a complete original Dockerfile.
+To see the merged filesystem without executing the entrypoint:
+
+```powershell
+$container = docker create --network none $image
+if ($LASTEXITCODE -ne 0) { throw 'Could not create the inspection container.' }
+try {
+    docker export --output .\dojo-rootfs.tar $container
+    if ($LASTEXITCODE -ne 0) { throw 'Could not export the image filesystem.' }
+    tar -tf .\dojo-rootfs.tar
+    if ($LASTEXITCODE -ne 0) { throw 'Could not list the image filesystem.' }
+} finally {
+    docker rm $container
+}
+```
+
+The exported filesystem does not include mounted volume contents or files
+generated only after startup. Runtime environment overrides are also separate
+from the image's defaults.
+
+To see the **rendered application**, run the image only on an isolated lab
+machine. It is intentionally vulnerable: do not use it in production, expose
+it publicly, or mount credentials or the Docker socket. Publish only NGINX to
+loopback rather than using Compose's default all-interface port mappings:
+
+```powershell
+docker run --rm --publish 127.0.0.1:8080:80 $image
+```
+
+Open <http://127.0.0.1:8080/> for the dashboard, `/evidence` for build-time
+NGINX evidence, and `/api/status` for runtime package/configuration observations.
+Stop with Ctrl+C. The runtime observations are not a Defender scan result or
+proof that the image is safe.
+
 ## Connectors
 
 Connectors are optional and permission-tiered. Start with the lowest tier that

@@ -300,6 +300,9 @@
     "readme": "README.md",
     "walkthrough": "WALKTHROUGH.md",
     "references": [
+      "https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/Dockerfile",
+      "https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/.github/workflows/deploy.yml",
+      "https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/blob/7a6d8fbd232000ab2de43f59a05ba5cdbc1e16c9/scripts/deploy.sh",
       "https://my.f5.com/manage/s/article/K000162097",
       "https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction"
     ]
