@@ -11,7 +11,7 @@ import Disclaimer from "../components/Disclaimer.astro";
     <meta name="viewport" content="width=device-width" />
     <meta
       name="description"
-      content="PawPrint deployment control plane for Ninja Paws cloud workloads."
+      content="PawPrint shared-services operations console for ninjapaws.org."
     />
     <meta name="theme-color" content="#101820" />
     <title>PawPrint Portal</title>
@@ -30,14 +30,15 @@ import Disclaimer from "../components/Disclaimer.astro";
       <a class="auth-link" href="/.auth/login/aad?post_login_redirect_uri=/" data-auth-link>Sign in with Microsoft</a>
     </header>
 
+    <a class="skip-link" href="#page-title">Skip to console</a>
     <main>
       <section class="command-band" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">Ninja Paws / deployment control</p>
+          <p class="eyebrow">ninjapaws.org / shared operations</p>
           <h1 id="page-title">Ship with<br /><em>receipts.</em></h1>
           <p class="lede">
-            One view for platform health, deployments, and the exact workflow
-            behind every action.
+            Shared services, workload observations, and reviewed workflow requests.
+            A successful deployment is not the same as a healthy application.
           </p>
         </div>
         <div class="command-panel">
@@ -53,10 +54,40 @@ import Disclaimer from "../components/Disclaimer.astro";
         </div>
       </section>
 
+      <nav class="console-nav" aria-label="Console views">
+        <a href="#shared-title">Shared services</a>
+        <a href="#workloads-title">Development controls</a>
+        <a href="#activity-title">Activity</a>
+        <a href="/operations/">Operator guide</a>
+      </nav>
+
+      <section class="shared-services" aria-labelledby="shared-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Organization overview</p>
+            <h2 id="shared-title">Shared services</h2>
+          </div>
+          <div class="shared-filters">
+            <label>Environment
+              <select data-shared-environment><option value="dev">Development</option><option value="prod">Production</option></select>
+            </label>
+            <label>View
+              <select data-shared-filter><option value="shared">Shared services</option><option value="workload">Organization workloads</option><option value="all">All services</option></select>
+            </label>
+            <button type="button" data-shared-refresh>Refresh observations</button>
+          </div>
+        </div>
+        <p class="shared-notice" data-shared-notice role="status">Checking authenticated sources. No resources are changed by viewing this console.</p>
+        <p class="source-legend">Desired configuration · provisioning · Azure availability · application health · workflow results are independent signals. Expand a service for sources and observation times.</p>
+        <div class="shared-grid" data-shared-services aria-busy="true">
+          <p>Loading the fixed service catalog…</p>
+        </div>
+      </section>
+
       <section class="summary-strip" aria-label="Platform summary">
-        <div><strong data-summary="ready">--</strong><span>ready</span></div>
-        <div><strong data-summary="running">--</strong><span>running</span></div>
-        <div><strong data-summary="attention">--</strong><span>attention</span></div>
+        <div><strong data-summary="ready">--</strong><span>successful workflows</span></div>
+        <div><strong data-summary="running">--</strong><span>running workflows</span></div>
+        <div><strong data-summary="attention">--</strong><span>unknown / attention</span></div>
         <button type="button" class="refresh-button" data-refresh aria-label="Refresh deployment status" title="Refresh deployment status"><RefreshCw aria-hidden="true" size={20} /></button>
       </section>
 
@@ -64,9 +95,9 @@ import Disclaimer from "../components/Disclaimer.astro";
         <div class="section-heading">
           <div>
             <p class="eyebrow">Current estate</p>
-            <h2 id="workloads-title">Workloads</h2>
+            <h2 id="workloads-title">Development controls</h2>
           </div>
-          <p>Actions are allowlisted by PawPrint. Browser input never becomes a shell command.</p>
+          <p>Legacy development controls remain separate. These are workflow outcomes, not live Azure health.</p>
         </div>
         <div class="workload-grid" data-workloads aria-live="polite">
           <p class="loading">Loading deployment state...</p>
@@ -81,8 +112,10 @@ import Disclaimer from "../components/Disclaimer.astro";
           </div>
         </div>
         <ol class="activity-list" data-activity>
-          <li>Waiting for the local controller.</li>
+          <li>Waiting for development workflow observations.</li>
         </ol>
+        <h3 class="shared-activity-heading">Shared workflow observations &amp; requests</h3>
+        <ol class="activity-list" data-shared-activity aria-live="polite"><li>No authenticated shared observations yet.</li></ol>
       </section>
 
       <section class="setup" aria-labelledby="setup-title" data-local-setup hidden>
@@ -164,6 +197,23 @@ import Disclaimer from "../components/Disclaimer.astro";
       <span class="footer-links"><a href="/legal/">Safety &amp; privacy</a><a href="https://github.com/ninjapaw/pawprint" target="_blank" rel="noreferrer">Source ↗</a></span>
     </footer>
 
+    <dialog class="operation-dialog" data-operation-dialog aria-labelledby="operation-title">
+      <form data-operation-form>
+        <h2 id="operation-title">Review workflow request</h2>
+        <p data-operation-description></p>
+        <p class="shared-notice" data-operation-notice></p>
+        <p>Request ID: <code data-operation-id></code></p>
+        <label><input type="checkbox" name="protected" required /> I confirm this uses the current protected configuration; scopes are not edited in this browser.</label>
+        <label data-write-confirmation hidden><input type="checkbox" name="write" /> I explicitly approve requesting the bounded write operation, subject to protected workflow approval and cost gates.</label>
+        <label data-discovery-confirmation hidden><input type="checkbox" name="discovery" /> I explicitly approve requesting discovery against the protected approved scope.</label>
+        <p data-operation-message role="status"></p>
+        <div class="dialog-actions">
+          <button type="button" data-operation-cancel>Cancel</button>
+          <button type="submit">Confirm workflow request</button>
+        </div>
+      </form>
+    </dialog>
     <script is:inline src="/portal.js"></script>
+    <script is:inline type="module" src="/shared-services.js"></script>
   </body>
 </html>

@@ -1,6 +1,8 @@
 ---
 import "../styles/portal.css";
 import Disclaimer from "../components/Disclaimer.astro";
+import auth from "../../config/portal-auth.json";
+const workforce = auth.mode === "workforce";
 ---
 
 <!doctype html>
@@ -21,14 +23,19 @@ import Disclaimer from "../components/Disclaimer.astro";
       </div>
       <p class="eyebrow">Ninja Paws / restricted control plane</p>
       <h1>Choose your<br /><em>identity.</em></h1>
-      <p class="lede">Access requires a provider-specific invitation to the <strong>admin</strong> role.</p>
+      <p class="lede">{workforce
+        ? "Access requires an explicitly assigned PawPrint Reader, Operator or Admin workforce app role. Signing in alone grants no operations access."
+        : <>Access requires a provider-specific invitation to the <strong>admin</strong> role.</>
+      }</p>
       <div class="login-actions">
         <a class="login-primary" href="/.auth/login/aad?post_login_redirect_uri=/">Continue with Microsoft Entra</a>
-        <a href="/.auth/login/github?post_login_redirect_uri=/">Continue with GitHub</a>
+        {!workforce && <a href="/.auth/login/github?post_login_redirect_uri=/">Continue with GitHub</a>}
       </div>
       <p class="login-note">
-        Entra is recommended for workforce administration. GitHub supports the invited
-        operator account used to administer the <strong>ninjapaw</strong> organization.
+        {workforce
+          ? "Only the approved single-tenant workforce registration is supported. Contact a workforce administrator for the least-privileged role you need."
+          : <>Entra is recommended for workforce administration. GitHub supports the invited operator account used to administer the <strong>ninjapaw</strong> organization. Workforce migration has not been enabled by this build.</>
+        }
       </p>
     </main>
   </body>

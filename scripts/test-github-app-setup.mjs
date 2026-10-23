@@ -93,7 +93,7 @@ assert.ok(
     ),
   "Azure must disable before the GitHub desired-state variable changes",
 );
-assert.match(workflow, /env:\s+GITHUB_APP_ENABLED:/);
+assert.match(workflow, /^\s+GITHUB_APP_ENABLED: \$\{\{ vars\.PAWPRINT_GITHUB_APP_ENABLED \}\}\r?$/m);
 assert.doesNotMatch(workflow, /githubAppId="\$\{\{ vars\./);
 process.stdout.write(
   "ok    GitHub App manifest is private and least-privilege\n",

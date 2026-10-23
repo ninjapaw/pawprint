@@ -7,7 +7,10 @@
       "repository": "ninjapaw/m365profiles",
       "siteUrl": "https://dev.m365profiles.com/",
       "statusWorkflow": "deploy.yml",
-      "steps": ["infrastructure", "application"]
+      "steps": [
+        "infrastructure",
+        "application"
+      ]
     },
     {
       "id": "site",
@@ -16,7 +19,10 @@
       "repository": "ninjapaw/site",
       "siteUrl": "https://dev.ninjapaws.org/",
       "statusWorkflow": "deploy.yml",
-      "steps": ["infrastructure", "application"]
+      "steps": [
+        "infrastructure",
+        "application"
+      ]
     },
     {
       "id": "sentinel-optimizer",
@@ -25,7 +31,10 @@
       "repository": "ninjapaw/sentinel-optimizer",
       "siteUrl": "https://dev.sentineloptimizer.com/",
       "statusWorkflow": "deploy-application.yml",
-      "steps": ["infrastructure", "application"]
+      "steps": [
+        "infrastructure",
+        "application"
+      ]
     },
     {
       "id": "ninjapaws-cloud-security-dojo",
@@ -40,6 +49,191 @@
         "scenario2-deploy",
         "scenario2-uninstall"
       ]
+    }
+  ],
+  "services": [
+    {
+      "id": "shared-easm",
+      "label": "External attack surface",
+      "description": "Shared Defender EASM. Discovery and coverage are not inferred from provisioning or workflow success.",
+      "kind": "easm",
+      "resourceTypes": [
+        "Microsoft.Easm/workspaces"
+      ],
+      "repository": "ninjapaw/pawprint",
+      "statusWorkflow": "shared-easm.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/easm.md",
+      "workflowUrl": "https://github.com/ninjapaw/pawprint/actions/workflows/shared-easm.yml"
+    },
+    {
+      "id": "external-dns",
+      "label": "External DNS · Cloudflare",
+      "description": "Public DNS observations only. No account access, token storage, ownership assertion, or hosted DNS writes.",
+      "kind": "dns",
+      "resourceTypes": [],
+      "zones": [
+        "ninjapaws.org",
+        "m365profiles.com",
+        "sentineloptimizer.com"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/external-dns.md"
+    },
+    {
+      "id": "shared-monitoring",
+      "label": "Shared monitoring",
+      "description": "Explicitly bound Log Analytics and Application Insights resources. No log contents are exposed.",
+      "kind": "monitoring",
+      "resourceTypes": [
+        "Microsoft.OperationalInsights/workspaces",
+        "Microsoft.Insights/components"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md"
+    },
+    {
+      "id": "platform-key-vault",
+      "label": "Platform Key Vault",
+      "description": "Resource metadata only. The console never reads or edits platform secrets.",
+      "kind": "vault",
+      "resourceTypes": [
+        "Microsoft.KeyVault/vaults"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md"
+    },
+    {
+      "id": "pawprint-portal",
+      "label": "PawPrint portal / API",
+      "description": "Existing Static Web App and linked Functions. API health is separate from Azure resource availability.",
+      "kind": "portal",
+      "resourceTypes": [
+        "Microsoft.Web/staticSites",
+        "Microsoft.Web/sites"
+      ],
+      "repository": "ninjapaw/pawprint",
+      "statusWorkflow": "deploy-portal-api.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md",
+      "workflowUrl": "https://github.com/ninjapaw/pawprint/actions/workflows/deploy-portal-api.yml"
+    },
+    {
+      "id": "pawton",
+      "label": "Pawton",
+      "description": "Training workload. Workflow results are not live health. Doctor can invoke a write-capable Defender posture audit; use the protected workflow.",
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/sites"
+      ],
+      "repository": "ninjapaw/pawton",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawton/actions/workflows/deploy.yml",
+      "workflowUrl": "https://github.com/ninjapaw/pawton/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "php2shell-cloud-defense-dojo",
+      "label": "PHP cloud defense dojo",
+      "description": "Training workload with explicit subscription and lab suffix requirements. No hosted deploy, paid protection or DNS actions.",
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/sites"
+      ],
+      "repository": "ninjapaw/php2shell-cloud-defense-dojo",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/php2shell-cloud-defense-dojo/actions/workflows/deploy.yml",
+      "workflowUrl": "https://github.com/ninjapaw/php2shell-cloud-defense-dojo/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "code-to-cloud-security-dojo",
+      "label": "Code-to-Cloud security dojo",
+      "description": "Status and protected workflow links only. Builds, cost gates and reviewed release confirmations are not bypassed.",
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/sites",
+        "Microsoft.App/containerApps"
+      ],
+      "repository": "ninjapaw/code-to-cloud-security-dojo",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/code-to-cloud-security-dojo/actions/workflows/deploy.yml",
+      "workflowUrl": "https://github.com/ninjapaw/code-to-cloud-security-dojo/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "m365profiles",
+      "label": "M365 Profiles",
+      "description": "Identity and licensing guidance, published as an Azure Static Web App.",
+      "repository": "ninjapaw/m365profiles",
+      "siteUrl": "https://dev.m365profiles.com/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        "infrastructure",
+        "application"
+      ],
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/staticSites",
+        "Microsoft.Web/sites",
+        "Microsoft.Compute/virtualMachines"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/m365profiles/actions",
+      "workflowUrl": "https://github.com/ninjapaw/m365profiles/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "site",
+      "label": "Ninja Paws Site",
+      "description": "The public Ninja Paws site and project directory.",
+      "repository": "ninjapaw/site",
+      "siteUrl": "https://dev.ninjapaws.org/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        "infrastructure",
+        "application"
+      ],
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/staticSites",
+        "Microsoft.Web/sites",
+        "Microsoft.Compute/virtualMachines"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/site/actions",
+      "workflowUrl": "https://github.com/ninjapaw/site/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "sentinel-optimizer",
+      "label": "Sentinel Optimizer",
+      "description": "Security telemetry cost analysis with a Static Web App and Azure Functions API.",
+      "repository": "ninjapaw/sentinel-optimizer",
+      "siteUrl": "https://dev.sentineloptimizer.com/",
+      "statusWorkflow": "deploy-application.yml",
+      "steps": [
+        "infrastructure",
+        "application"
+      ],
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/staticSites",
+        "Microsoft.Web/sites",
+        "Microsoft.Compute/virtualMachines"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/sentinel-optimizer/actions",
+      "workflowUrl": "https://github.com/ninjapaw/sentinel-optimizer/actions/workflows/deploy-application.yml"
+    },
+    {
+      "id": "ninjapaws-cloud-security-dojo",
+      "label": "Cloud Security Dojo",
+      "description": "The deliberately vulnerable container-security training estate.",
+      "repository": "ninjapaw/ninjapaws-cloud-security-dojo",
+      "siteUrl": "https://ninjapaws-dojo-app-dev.azurewebsites.net/",
+      "statusWorkflow": "deploy.yml",
+      "steps": [
+        "application",
+        "scenario1-uninstall",
+        "scenario2-deploy",
+        "scenario2-uninstall"
+      ],
+      "kind": "workload",
+      "resourceTypes": [
+        "Microsoft.Web/staticSites",
+        "Microsoft.Web/sites",
+        "Microsoft.Compute/virtualMachines"
+      ],
+      "guideUrl": "https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/actions",
+      "workflowUrl": "https://github.com/ninjapaw/ninjapaws-cloud-security-dojo/actions/workflows/deploy.yml"
     }
   ]
 }

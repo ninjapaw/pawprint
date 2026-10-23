@@ -16,14 +16,15 @@
  *   node scripts/vendor-sync.mjs --target ../site ../m365profiles --check
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = join(REPO_ROOT, "config", "vendor.manifest.json");
-const VENDOR_PREFIX = join("vendor", "pawprint");
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -32,11 +33,60 @@ const { values, positionals } = parseArgs({
     add: { type: "string", multiple: true, default: [] },
     check: { type: "boolean", default: false },
     "verify-sources": { type: "boolean", default: false },
+    prefix: { type: "string", default: "vendor/pawprint" },
+    snapshot: { type: "boolean", default: false },
+    "verify-snapshot": { type: "string" },
   },
 });
 
+const normalise = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+const contentHash = (path) => createHash("sha256").update(normalise(path)).digest("hex");
+const validPrefix = (prefix) => typeof prefix === "string" && /^vendor\/pawprint(?:-[a-z0-9-]+)?$/.test(prefix);
+const vendorPrefix = values.prefix.replaceAll("\\", "/");
+if (!validPrefix(vendorPrefix)) throw new Error("--prefix must be vendor/pawprint or a vendor/pawprint-NAME snapshot directory.");
+
+if (values["verify-snapshot"]) {
+  const path = resolve(values["verify-snapshot"]);
+  let snapshot;
+  try {
+    snapshot = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error("Cannot read a valid Pawprint vendor snapshot; contents omitted.");
+  }
+  const targetRoot = resolve(dirname(path), "..");
+  if (snapshot.version !== 1 || snapshot.source !== "https://github.com/ninjapaw/pawprint"
+      || !validPrefix(snapshot.vendorPath)
+      || resolve(targetRoot, `${snapshot.vendorPath}.manifest.json`) !== path
+      || !Array.isArray(snapshot.files) || !snapshot.files.length || snapshot.files.length > 100) {
+    throw new Error("Invalid Pawprint vendor snapshot metadata or location.");
+  }
+  const seen = new Set();
+  for (const entry of snapshot.files) {
+    if (typeof entry.path !== "string" || !/^[a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*$/i.test(entry.path)
+        || entry.path.split("/").some((part) => [".", ".."].includes(part))
+        || seen.has(entry.path) || !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "")) {
+      throw new Error("Invalid or duplicate path/hash in Pawprint vendor snapshot.");
+    }
+    seen.add(entry.path);
+    const file = join(targetRoot, ...snapshot.vendorPath.split("/"), ...entry.path.split("/"));
+    if (!existsSync(file) || contentHash(file) !== entry.sha256) {
+      throw new Error(`Pawprint snapshot drift at ${entry.path}; re-sync from reviewed shared source.`);
+    }
+    process.stdout.write(`ok    snapshot  ${entry.path}\n`);
+  }
+  process.stdout.write(`Verified ${seen.size} vendored Pawprint snapshot files.\n`);
+  process.exit(0);
+}
+
 const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
 const known = new Set(manifest.files.map((entry) => entry.path));
+const byPath = new Map(manifest.files.map((entry) => [entry.path, entry]));
+for (const entry of manifest.files) {
+  if (entry.requires !== undefined && !Array.isArray(entry.requires)) throw new Error(`Invalid vendor dependencies for ${entry.path}.`);
+  for (const dependency of entry.requires ?? []) {
+    if (!known.has(dependency)) throw new Error(`Unknown vendor dependency for ${entry.path}.`);
+  }
+}
 
 // Runs in this repository's own CI: a shared file renamed without updating the
 // manifest would silently stop being vendored anywhere.
@@ -77,8 +127,6 @@ for (const requested of values.add) {
   }
 }
 
-const normalise = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
-
 let drifted = 0;
 let copied = 0;
 let missingSources = 0;
@@ -92,9 +140,22 @@ for (const target of targets) {
 
   process.stdout.write(`\n${targetRoot}\n`);
 
+  const selected = new Set();
+  function select(path) {
+    if (selected.has(path)) return;
+    selected.add(path);
+    for (const dependency of byPath.get(path).requires ?? []) select(dependency);
+  }
+  for (const entry of manifest.files) {
+    if (existsSync(join(targetRoot, ...vendorPrefix.split("/"), entry.path))
+        || values.add.some((candidate) => candidate.replaceAll("\\", "/") === entry.path)) {
+      select(entry.path);
+    }
+  }
+
   for (const entry of manifest.files) {
     const source = join(REPO_ROOT, entry.path);
-    const destination = join(targetRoot, VENDOR_PREFIX, entry.path);
+    const destination = join(targetRoot, ...vendorPrefix.split("/"), entry.path);
 
     if (!existsSync(source)) {
       process.stderr.write(
@@ -104,9 +165,7 @@ for (const target of targets) {
       continue;
     }
 
-    const requested = values.add.some(
-      (candidate) => candidate.split("\\").join("/") === entry.path,
-    );
+    const requested = selected.has(entry.path);
     if (!existsSync(destination) && !requested) {
       process.stdout.write(`  skip  ${entry.path} (not vendored here)\n`);
       continue;
@@ -132,6 +191,22 @@ for (const target of targets) {
     process.stdout.write(
       `  sync  ${relative(targetRoot, destination).split("\\").join("/")}\n`,
     );
+  }
+  if (values.snapshot && !values.check) {
+    const sourceRevision = execFileSync("git", ["-C", REPO_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const files = manifest.files
+      .filter((entry) => existsSync(join(targetRoot, ...vendorPrefix.split("/"), entry.path)))
+      .map((entry) => ({
+        path: entry.path,
+        sha256: contentHash(join(targetRoot, ...vendorPrefix.split("/"), entry.path)),
+      }));
+    if (!files.length) throw new Error("A vendor snapshot requires at least one explicitly selected or existing shared file.");
+    writeFileSync(join(targetRoot, `${vendorPrefix}.manifest.json`), `${JSON.stringify({
+      version: 1, source: "https://github.com/ninjapaw/pawprint",
+      sourceRevision: `working-tree@${sourceRevision}`, vendorPath: vendorPrefix,
+      note: "Content hashes identify this reviewed source snapshot; the base commit alone does not. Publish shared-source changes before consumers. Existing core-kit workflow pins remain unchanged.",
+      files,
+    }, null, 2)}\n`);
   }
 }
 

@@ -7,11 +7,27 @@ on:
       - .github/workflows/deploy-portal-api.yml
       - api/**
       - infra/portal/**
+      - config/portal*.json
+      - config/platform.json
+      - .node-version
+      - scripts/check-portal-host.mjs
+      - scripts/check-portal-infra.mjs
+      - scripts/check-portal-preview.mjs
+      - scripts/generate-portal-catalog.mjs
+      - scripts/configure-portal-auth.mjs
+      - scripts/lib/portal-auth.mjs
+      - scripts/test-portal-host.mjs
+      - scripts/test-portal-preview.mjs
   workflow_dispatch:
     inputs:
       deploy-infrastructure:
         description: Apply the reviewed portal Bicep before publishing API code
         required: true
+        default: false
+        type: boolean
+      preview-only:
+        description: Preview reviewed infrastructure only; never apply it or publish API code
+        required: false
         default: false
         type: boolean
 
@@ -35,16 +51,20 @@ jobs:
           cache-dependency-path: api/package-lock.json
       - run: npm ci
         working-directory: api
+      - run: node scripts/generate-portal-catalog.mjs --check && node scripts/configure-portal-auth.mjs --check
       - run: npm run typecheck
         working-directory: api
       - run: npm test
         working-directory: api
       - run: npm run build
         working-directory: api
+      - name: Test rollout preview scope and privacy guards
+        run: node --test scripts/test-portal-preview.mjs scripts/test-portal-host.mjs
       - name: Compile infrastructure
         run: |
           az bicep build --file infra/portal/main.bicep --outfile "$RUNNER_TEMP/portal.json"
           az bicep build-params --file infra/portal/main.dev.bicepparam --outfile "$RUNNER_TEMP/portal.parameters.json"
+          node scripts/check-portal-infra.mjs "$RUNNER_TEMP/portal.json" "$RUNNER_TEMP/portal.parameters.json"
       - name: Package Function App
         working-directory: api
         run: |
@@ -58,6 +78,7 @@ jobs:
           retention-days: 1
 
   deploy:
+    if: github.ref == 'refs/heads/dev'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -67,50 +88,87 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: pawprint-portal-api
           path: function-package
       - name: Sign in for infrastructure deployment
-        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+        if: github.event_name == 'workflow_dispatch' && (inputs.deploy-infrastructure || inputs.preview-only)
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Deploy infrastructure
-        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+      - name: Preview or deploy reviewed infrastructure
+        if: github.event_name == 'workflow_dispatch' && (inputs.deploy-infrastructure || inputs.preview-only)
         env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PORTAL_RESOURCE_GROUP: NP-Platform-Dev-CentralUS
+          PREVIEW_ONLY: ${{ inputs.preview-only }}
           GITHUB_APP_ENABLED: ${{ vars.PAWPRINT_GITHUB_APP_ENABLED }}
           GITHUB_APP_ID: ${{ vars.PAWPRINT_GITHUB_APP_ID }}
           GITHUB_APP_INSTALLATION_ID: ${{ vars.PAWPRINT_GITHUB_APP_INSTALLATION_ID }}
         run: |
+          set -euo pipefail
           [[ "${GITHUB_APP_ENABLED:-false}" =~ ^(true|false)$ ]]
           if [[ "${GITHUB_APP_ENABLED:-false}" == true ]]; then
             [[ "$GITHUB_APP_ID" =~ ^[1-9][0-9]*$ ]]
             [[ "$GITHUB_APP_INSTALLATION_ID" =~ ^[1-9][0-9]*$ ]]
           fi
-          az deployment group create \
-            --name "pawprint-portal-${GITHUB_RUN_NUMBER}" \
-            --resource-group NP-Platform-Dev-CentralUS \
-            --template-file infra/portal/main.bicep \
-            --parameters infra/portal/main.dev.bicepparam \
-            --parameters \
-              githubAppEnabled="${GITHUB_APP_ENABLED:-false}" \
-              githubAppId="${GITHUB_APP_ID:-}" \
+          template="$RUNNER_TEMP/pawprint-portal-template.json"
+          parameters="$RUNNER_TEMP/pawprint-portal-parameters.json"
+          az bicep build --file infra/portal/main.bicep --outfile "$template"
+          az bicep build-params --file infra/portal/main.dev.bicepparam --outfile "$parameters"
+          args=(
+            --subscription "$AZURE_SUBSCRIPTION_ID"
+            --resource-group "$PORTAL_RESOURCE_GROUP"
+            --template-file "$template"
+            --parameters "$parameters"
+              githubAppEnabled="${GITHUB_APP_ENABLED:-false}"
+              githubAppId="${GITHUB_APP_ID:-}"
               githubAppInstallationId="${GITHUB_APP_INSTALLATION_ID:-}"
+          )
+          report="$RUNNER_TEMP/pawprint-portal-what-if.json"
+          az deployment group what-if "${args[@]}" --no-pretty-print --output json > "$report"
+          node scripts/check-portal-preview.mjs "$report"
+          if [[ "$PREVIEW_ONLY" != true ]]; then
+            az deployment group create "${args[@]}" \
+              --name "pawprint-portal-${GITHUB_RUN_NUMBER}" --output none
+          fi
 
       - name: Sign out infrastructure identity
-        if: github.event_name == 'workflow_dispatch' && inputs.deploy-infrastructure
+        if: github.event_name == 'workflow_dispatch' && (inputs.deploy-infrastructure || inputs.preview-only)
         run: az logout
 
       - name: Sign in for Function publication
+        if: github.event_name != 'workflow_dispatch' || !inputs.preview-only
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_API_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify Function runtime before publication
+        id: publication-target
+        if: github.event_name != 'workflow_dispatch' || !inputs.preview-only
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PORTAL_RESOURCE_GROUP: NP-Platform-Dev-CentralUS
+          PORTAL_FUNCTION_APP: np-pawprint-api-dev-centralus
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/pawprint-portal-host.json"
+          az functionapp show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$PORTAL_RESOURCE_GROUP" \
+            --name "$PORTAL_FUNCTION_APP" \
+            --query '{id:id,hostName:defaultHostName,runtimeName:functionAppConfig.runtime.name,runtimeVersion:functionAppConfig.runtime.version}' \
+            --output json > "$report"
+          node scripts/check-portal-host.mjs "$report" >> "$GITHUB_OUTPUT"
       - name: Deploy Function App with One Deploy
+        if: github.event_name != 'workflow_dispatch' || !inputs.preview-only
         run: |
           az functionapp deployment source config-zip \
             --resource-group NP-Platform-Dev-CentralUS \
@@ -119,17 +177,37 @@ jobs:
             --output none
 
       - name: Verify linked API and direct-host isolation
+        if: github.event_name != 'workflow_dispatch' || !inputs.preview-only
+        env:
+          PORTAL_API_ORIGIN: ${{ steps.publication-target.outputs.origin }}
         run: |
-          linked_status="$(curl --silent --show-error --output "$RUNNER_TEMP/health.json" --write-out '%{http_code}' \
+          set -euo pipefail
+          probe=(--silent --show-error --connect-timeout 10 --max-time 30 --retry 4 --retry-delay 5 --retry-max-time 150)
+          linked_status="$(curl "${probe[@]}" --output "$RUNNER_TEMP/health.json" --write-out '%{http_code}' \
             https://jolly-desert-067886210.3.azurestaticapps.net/api/health)"
-          test "$linked_status" = 200
-          jq -e '.status == "ok"' "$RUNNER_TEMP/health.json" >/dev/null
+          if [[ "$linked_status" != 200 ]]; then
+            echo "::error title=Linked API health failed::Expected HTTP 200, received $linked_status."
+            exit 1
+          fi
+          if ! jq -e '.status == "ok"' "$RUNNER_TEMP/health.json" >/dev/null; then
+            echo "::error title=Linked API health failed::The health payload did not confirm status ok."
+            exit 1
+          fi
 
           forged_principal="$(printf '%s' '{"identityProvider":"github","userId":"forged","userDetails":"forged","userRoles":["admin"]}' | base64 --wrap=0)"
-          direct_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+          direct_status="$(curl "${probe[@]}" --output /dev/null --write-out '%{http_code}' \
             --header "x-ms-client-principal: $forged_principal" \
-            https://np-pawprint-api-dev-centralus.azurewebsites.net/api/admin/status)"
-          if [[ "$direct_status" = 200 || "$direct_status" = 202 ]]; then
-            echo "::error title=Direct Function isolation failed::A forged SWA principal reached the Function host."
+            "$PORTAL_API_ORIGIN/api/admin/status")"
+          if [[ "$direct_status" != 401 && "$direct_status" != 403 ]]; then
+            echo "::error title=Direct Function isolation unverified::Expected a platform 401/403 denial, received HTTP $direct_status."
+            exit 1
+          fi
+
+          forged_workforce="$(printf '%s' '{"identityProvider":"aad","userId":"forged","userDetails":"forged","userRoles":["authenticated","reader","operator","admin"]}' | base64 --wrap=0)"
+          shared_status="$(curl "${probe[@]}" --output /dev/null --write-out '%{http_code}' \
+            --header "x-ms-client-principal: $forged_workforce" \
+            "$PORTAL_API_ORIGIN/api/shared/status")"
+          if [[ "$shared_status" != 401 && "$shared_status" != 403 ]]; then
+            echo "::error title=Shared backend isolation unverified::Expected a platform 401/403 denial, received HTTP $shared_status. Application setup responses are not proof of platform isolation."
             exit 1
           fi

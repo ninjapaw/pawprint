@@ -34,6 +34,7 @@ const SHIPPED_CONFIG = [
     schema: "platform-connectors.schema.json",
   },
   { file: "config/deploy.defaults.json", schema: "deploy.config.schema.json" },
+  { file: "config/easm.config.example.json", schema: "easm.config.schema.json" },
 ];
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));

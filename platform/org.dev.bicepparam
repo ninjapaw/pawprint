@@ -14,5 +14,13 @@ param deployPlatformKeyVault = false
 param keyVaultName = 'np-platform-dev-kv'
 param keyVaultAdminPrincipalIds = []
 
+// Explicit billable opt-in. Keep off unless a separate development inventory is intended.
+param deployEasm = false
+param easmWorkspaceName = 'easm-np-platform-dev-centralus'
+param easmLocation = 'centralus'
+param easmAccessBindings = []
+param easmBudget = null
+param easmProtectFromDeletion = false
+
 // DNS is hosted externally today; adding zones here would move authority.
 param dnsZoneNames = []

@@ -1,0 +1,13 @@
+{
+  "defaultProfile": "legacy",
+  "hostedShared": {
+    "appName": "NinjaPaws Pawprint Deploy",
+    "repositories": [
+      "m365profiles",
+      "site",
+      "sentinel-optimizer",
+      "ninjapaws-cloud-security-dojo",
+      "pawprint"
+    ]
+  }
+}

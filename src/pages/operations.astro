@@ -1,0 +1,24 @@
+---
+import "../styles/portal.css";
+import Disclaimer from "../components/Disclaimer.astro";
+import { Content } from "../../docs/portal-operations.md";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="PawPrint shared-services operator guide, trust boundaries and staged workforce setup." />
+    <title>Operator guide | PawPrint Portal</title>
+  </head>
+  <body>
+    <Disclaimer />
+    <header class="topbar">
+      <a class="brand" href="/"><img src="/pawprint-mark.svg" alt="" width="36" height="36" /><span>Paw<strong>Print</strong> Portal</span></a>
+      <a class="auth-link" href="/">Back to console</a>
+    </header>
+    <main class="operator-guide"><Content /></main>
+    <footer><a href="/">Back to shared services</a><a href="/legal/">Safety &amp; privacy</a></footer>
+  </body>
+</html>

@@ -1,4 +1,7 @@
 import { createAppAuth } from "@octokit/auth-app";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const GITHUB_ORGANIZATION = "ninjapaw";
 export const GITHUB_APP_NAME = "NinjaPaws Pawprint Deploy";
@@ -12,6 +15,60 @@ export const GITHUB_APP_PERMISSIONS = Object.freeze({
   actions: "write",
   metadata: "read",
 });
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const readConfiguration = (path) =>
+  JSON.parse(readFileSync(join(root, path), "utf8"));
+const profileConfiguration = readConfiguration("config/portal-github-app.json");
+const approvedRepositories = new Set([
+  ...readConfiguration("config/portal.json").workloads.map((workload) => workload.repository),
+  ...readConfiguration("config/portal-services.json").services.map((service) => service.repository).filter(Boolean),
+].map((repository) => {
+  if (!/^ninjapaw\/[a-z0-9][a-z0-9-]*$/.test(repository)) {
+    throw new Error("Unsafe repository in the reviewed portal catalog.");
+  }
+  return repository.slice("ninjapaw/".length);
+}));
+
+export function resolveGitHubAppProfile(
+  profileId = profileConfiguration.defaultProfile,
+  configuration = profileConfiguration,
+) {
+  if (!configuration || !["legacy", "hosted-shared"].includes(configuration.defaultProfile)
+    || Object.keys(configuration).some((key) => !["defaultProfile", "hostedShared"].includes(key))) {
+    throw new Error("Invalid portal GitHub App profile configuration.");
+  }
+  if (profileId === "legacy") return Object.freeze({
+    id: "legacy", appName: GITHUB_APP_NAME,
+    repositories: GITHUB_APP_REPOSITORIES, permissions: GITHUB_APP_PERMISSIONS,
+  });
+  if (profileId !== "hosted-shared") throw new Error("Unknown GitHub App profile; choose legacy or hosted-shared explicitly.");
+  const desired = configuration.hostedShared;
+  if (!desired || Object.keys(desired).some((key) => !["appName", "repositories"].includes(key))
+    || typeof desired.appName !== "string" || !desired.appName.trim() || desired.appName.length > 100
+    || !Array.isArray(desired.repositories) || !desired.repositories.includes("pawprint")
+    || new Set(desired.repositories).size !== desired.repositories.length
+    || desired.repositories.some((repository) => !approvedRepositories.has(repository))) {
+    throw new Error("The hosted-shared profile requires pawprint and an explicit, unique subset of reviewed catalog repositories; permissions cannot be broadened.");
+  }
+  return Object.freeze({
+    id: "hosted-shared", appName: desired.appName.trim(),
+    repositories: Object.freeze([...desired.repositories]), permissions: GITHUB_APP_PERMISSIONS,
+  });
+}
+
+export function githubAppProfileSummary(profile) {
+  return {
+    profile: profile.id,
+    organization: GITHUB_ORGANIZATION,
+    appName: profile.appName,
+    repositorySelection: "selected",
+    desiredRepositories: profile.repositories,
+    permissions: profile.permissions,
+    unselectedCatalogRepositories: [...approvedRepositories].filter((repository) => !profile.repositories.includes(repository)).sort(),
+    liveInstallationVerified: false,
+  };
+}
 
 function exactPermissions(actual) {
   const active = Object.entries(actual ?? {})
@@ -27,6 +84,7 @@ export function validateInstallationAccess(
   appDetails,
   installation,
   repositoryNames,
+  profile = resolveGitHubAppProfile("legacy"),
 ) {
   const appPermissions = Object.fromEntries(
     Object.entries(appDetails.permissions ?? {}).filter(
@@ -35,7 +93,7 @@ export function validateInstallationAccess(
   );
   const appValid =
     appDetails.owner?.login?.toLowerCase() === GITHUB_ORGANIZATION &&
-    appDetails.name === GITHUB_APP_NAME &&
+    appDetails.name === profile.appName &&
     exactPermissions(appPermissions) &&
     Array.isArray(appDetails.events) &&
     appDetails.events.length === 0;
@@ -48,20 +106,28 @@ export function validateInstallationAccess(
   const repositoriesValid =
     installation.repository_selection === "selected" &&
     JSON.stringify([...repositoryNames].sort()) ===
-      JSON.stringify([...GITHUB_APP_REPOSITORIES].sort());
-  return { appPermissions, appValid, permissionsValid, repositoriesValid };
+      JSON.stringify([...profile.repositories].sort());
+  const missingRepositories = profile.repositories.filter((repository) => !repositoryNames.includes(repository));
+  const unexpectedRepositories = repositoryNames.filter((repository) => !profile.repositories.includes(repository));
+  return {
+    appPermissions, appValid, permissionsValid, repositoriesValid,
+    profile: profile.id, requiredRepositories: profile.repositories,
+    missingRepositories, unexpectedRepositories,
+  };
 }
 
-export function createGitHubAppManifest(origin, installationState = "setup") {
+export function createGitHubAppManifest(origin, installationState = "setup", profile = resolveGitHubAppProfile("legacy")) {
   const base = new URL(origin);
   if (base.protocol !== "http:" || base.hostname !== "127.0.0.1") {
     throw new Error("GitHub App setup requires the loopback PawPrint Portal.");
   }
   return {
-    name: GITHUB_APP_NAME,
+    name: profile.appName,
     url: "https://github.com/ninjapaw/pawprint",
     description:
-      "Dispatches allowlisted Ninja Paws development workflows from PawPrint Portal.",
+      profile.id === "legacy"
+        ? "Dispatches allowlisted Ninja Paws development workflows from PawPrint Portal."
+        : "Runs fixed shared-service workflows and observes explicitly selected Ninja Paws workload workflows.",
     redirect_url: `${origin}/api/setup/github-app/callback`,
     setup_url: `${origin}/api/setup/github-app/installed?state=${installationState}`,
     setup_on_update: true,
@@ -115,7 +181,7 @@ export async function githubAppRequest(app, path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-export async function inspectInstallation(app) {
+export async function inspectInstallation(app, profile = resolveGitHubAppProfile("legacy")) {
   const appDetails = await githubAppRequest(app, "/app");
   const installations = await githubAppRequest(
     app,
@@ -151,8 +217,8 @@ export async function inspectInstallation(app) {
   const repositoryNames = (await repositoriesResponse.json()).repositories
     .map((repository) => repository.name)
     .sort();
-  const { appPermissions, appValid, permissionsValid, repositoriesValid } =
-    validateInstallationAccess(appDetails, installation, repositoryNames);
+  const validation =
+    validateInstallationAccess(appDetails, installation, repositoryNames, profile);
 
   return {
     id: installation.id,
@@ -160,13 +226,10 @@ export async function inspectInstallation(app) {
     repositorySelection: installation.repository_selection,
     permissions: installation.permissions,
     repositories: repositoryNames,
-    appValid,
+    ...validation,
     appOwner: appDetails.owner?.login ?? null,
     appName: appDetails.name,
     appEvents: appDetails.events,
-    appPermissions,
-    valid: appValid && permissionsValid && repositoriesValid,
-    permissionsValid,
-    repositoriesValid,
+    valid: validation.appValid && validation.permissionsValid && validation.repositoriesValid,
   };
 }

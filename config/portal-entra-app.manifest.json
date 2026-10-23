@@ -1,0 +1,33 @@
+{
+  "displayName": "Ninja Paws PawPrint Workforce",
+  "signInAudience": "AzureADMyOrg",
+  "web": {
+    "redirectUris": ["https://jolly-desert-067886210.3.azurestaticapps.net/.auth/login/aad/callback"]
+  },
+  "appRoles": [
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Read shared-service observations; no workflow requests.",
+      "displayName": "PawPrint Reader",
+      "id": "466070a0-770b-4b9c-a627-fb35de777eb2",
+      "isEnabled": true,
+      "value": "PawPrint.Reader"
+    },
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Review and request fixed non-writing validation, plan and verification workflows.",
+      "displayName": "PawPrint Operator",
+      "id": "bf250421-2088-4e17-b86c-92ada840bc91",
+      "isEnabled": true,
+      "value": "PawPrint.Operator"
+    },
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Explicitly request bounded approved EASM write and discovery workflows.",
+      "displayName": "PawPrint Admin",
+      "id": "3a860b33-4cf2-4dad-8c9b-02b516287dac",
+      "isEnabled": true,
+      "value": "PawPrint.Admin"
+    }
+  ]
+}

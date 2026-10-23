@@ -1,0 +1,118 @@
+name: Shared EASM plan, deploy, and discovery
+
+run-name: Shared EASM - ${{ inputs.environment }} - ${{ inputs.operation }} - ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Approved primary shared environment (configuration must match)
+        type: choice
+        options: [prod, dev]
+        default: prod
+        required: true
+      operation:
+        description: Discovery setup and execution are separate from infrastructure deployment
+        type: choice
+        options: [plan, validate, register-provider, what-if, deploy, discovery-plan, discovery-apply, run-discovery, verify]
+        default: plan
+        required: true
+      approve_write:
+        description: Approve the selected Azure write and applicable ongoing asset costs
+        type: boolean
+        default: false
+      approve_discovery:
+        description: Authorize recursive discovery of the declared scope and resulting service/billing effects
+        type: boolean
+        default: false
+      request_id:
+        description: Optional portal correlation UUID; not authorization or approval
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-easm-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  easm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      EASM_CONFIG_JSON: ${{ secrets.EASM_CONFIG_JSON }}
+      EASM_TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      EASM_SOURCE_REF: ${{ github.ref_name }}
+      EASM_OPERATION: ${{ inputs.operation }}
+      EASM_REQUEST_ID: ${{ inputs.request_id }}
+      APPROVE_WRITE: ${{ inputs.approve_write }}
+      APPROVE_DISCOVERY: ${{ inputs.approve_discovery }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_EXTENSION_USE_DYNAMIC_INSTALL: "no"
+      AZURE_CORE_COLLECT_TELEMETRY: "false"
+      AZURE_LOGIN_POST_CLEANUP: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install declared dependencies without lifecycle hooks
+        run: npm ci --ignore-scripts
+      - name: Validate configuration and approval boundaries before login
+        run: |
+          set -euo pipefail
+          node scripts/easm.mjs validate
+          case "$EASM_OPERATION" in
+            plan|validate) ;;
+            *)
+              case "$EASM_SOURCE_REF:$EASM_TARGET_ENVIRONMENT" in
+                main:prod|dev:dev) ;;
+                *) echo "::error::Cloud operations require main/prod or dev/dev."; exit 1 ;;
+              esac
+              ;;
+          esac
+          case "$EASM_OPERATION" in
+            deploy|register-provider|discovery-apply|run-discovery)
+              [[ "$APPROVE_WRITE" == true ]] || { echo "::error::Explicit write/cost approval is required."; exit 1; }
+              ;;
+          esac
+          case "$EASM_OPERATION" in
+            discovery-apply|run-discovery)
+              [[ "$APPROVE_DISCOVERY" == true ]] || { echo "::error::Separate discovery authorization is required."; exit 1; }
+              ;;
+          esac
+      - name: Use ephemeral Azure CLI configuration
+        if: inputs.operation != 'plan' && inputs.operation != 'validate'
+        run: printf 'AZURE_CONFIG_DIR=%s/shared-easm-azure\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Authenticate with the explicitly selected scoped identity
+        if: inputs.operation != 'plan' && inputs.operation != 'validate'
+        uses: azure/login@935127ca5bb3c4b02c9c2c10060028383878f33f # v3
+        with:
+          client-id: ${{ vars[(inputs.operation == 'verify' || inputs.operation == 'discovery-plan') && 'AZURE_READ_CLIENT_ID' || 'AZURE_CLIENT_ID'] }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Install the reviewed Bicep compiler for infrastructure operations
+        if: inputs.operation == 'what-if' || inputs.operation == 'deploy'
+        run: az bicep install --version v0.48.1
+      - name: Execute only the selected guarded operation
+        run: |
+          set -euo pipefail
+          args=("$EASM_OPERATION")
+          if [[ "$APPROVE_WRITE" == true ]]; then args+=(--yes); fi
+          case "$EASM_OPERATION" in
+            discovery-apply|run-discovery)
+              if [[ "$APPROVE_DISCOVERY" == true ]]; then args+=(--approve-discovery); fi
+              ;;
+          esac
+          node scripts/easm.mjs "${args[@]}"

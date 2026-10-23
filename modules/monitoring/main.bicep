@@ -27,6 +27,9 @@ param dailyQuotaGb int = 1
 @maxValue(100)
 param samplingPercentage int = 100
 
+@description('Emit the Application Insights connection string for SDK consumers. Disable when the caller needs only diagnostics and must not persist connection material in deployment outputs.')
+param emitApplicationInsightsConnectionString bool = true
+
 var moduleTags = union(tags, { component: 'monitoring' })
 
 resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
@@ -71,4 +74,4 @@ output workspaceCustomerId string = workspace.properties.customerId
 output applicationInsightsId string = applicationInsights.id
 
 @description('Application Insights connection string.')
-output applicationInsightsConnectionString string = applicationInsights.properties.ConnectionString
+output applicationInsightsConnectionString string = emitApplicationInsightsConnectionString ? applicationInsights.properties.ConnectionString : ''

@@ -15,16 +15,15 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
   createGitHubAppManifest,
-  GITHUB_APP_NAME,
-  GITHUB_APP_PERMISSIONS,
-  GITHUB_APP_REPOSITORIES,
   GITHUB_ORGANIZATION,
   inspectInstallation,
+  resolveGitHubAppProfile,
   validateManifestConversion,
 } from "./github-app-setup.mjs";
 
 const executeFile = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const githubAppProfile = resolveGitHubAppProfile(process.env.PAWPRINT_GITHUB_APP_PROFILE);
 const dist = join(root, "dist");
 const config = JSON.parse(
   readFileSync(join(root, "config", "portal.json"), "utf8"),
@@ -599,9 +598,10 @@ async function setupOverview() {
 
   return {
     organization: GITHUB_ORGANIZATION,
-    appName: GITHUB_APP_NAME,
-    requiredPermissions: GITHUB_APP_PERMISSIONS,
-    requiredRepositories: GITHUB_APP_REPOSITORIES,
+    appName: githubAppProfile.appName,
+    profile: githubAppProfile.id,
+    requiredPermissions: githubAppProfile.permissions,
+    requiredRepositories: githubAppProfile.repositories,
     github: {
       membershipState: membership?.state ?? "unknown",
       organizationRole: membership?.role ?? "unknown",
@@ -1792,7 +1792,7 @@ async function disableGitHubApp() {
 async function auditAndEnableStoredGitHubApp() {
   const app = pendingGitHubApp ?? (await loadStoredGitHubApp());
   if (!app) throw new Error("No stored Pawprint GitHub App is available.");
-  const installation = await inspectInstallation(app);
+  const installation = await inspectInstallation(app, githubAppProfile);
   if (!installation?.valid) {
     throw new Error(
       "The GitHub App installation does not match the required owner, permissions, and repositories.",
@@ -2183,7 +2183,7 @@ const server = createServer(async (request, response) => {
       });
       sendJson(response, 200, {
         action: `https://github.com/organizations/${GITHUB_ORGANIZATION}/settings/apps/new?state=${state}`,
-        manifest: createGitHubAppManifest(origin, installationState),
+        manifest: createGitHubAppManifest(origin, installationState, githubAppProfile),
       });
       return;
     }
@@ -2278,12 +2278,12 @@ const server = createServer(async (request, response) => {
       }
       installationStates.delete(state);
       try {
-        const installation = await inspectInstallation(pendingGitHubApp);
+        const installation = await inspectInstallation(pendingGitHubApp, githubAppProfile);
         if (!installation?.valid) {
           sendSetupResult(
             response,
             "Installation needs attention",
-            "Install the App on the ninjapaw organization and select exactly the four listed workload repositories.",
+            `Install the App on ninjapaw with selected-repository access matching the explicit ${githubAppProfile.id} profile (${githubAppProfile.repositories.length} listed repositories).`,
             false,
           );
           return;
@@ -2316,7 +2316,7 @@ const server = createServer(async (request, response) => {
       assertLocalPost(request);
       const installation = await auditAndEnableStoredGitHubApp();
       sendJson(response, 200, {
-        message: `Hosted dispatch enabled for ${installation.repositories.length} repositories.`,
+        message: `Hosted dispatch enabled for the ${githubAppProfile.id} profile (${installation.repositories.length} repositories). Shared EASM authorization, configuration and storage gates are separate and unchanged.`,
         installation,
       });
       return;
@@ -2334,7 +2334,7 @@ const server = createServer(async (request, response) => {
         });
         return;
       }
-      sendJson(response, 200, { installation: await inspectInstallation(app) });
+      sendJson(response, 200, { installation: await inspectInstallation(app, githubAppProfile) });
       return;
     }
     if (

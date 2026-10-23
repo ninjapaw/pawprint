@@ -51,6 +51,29 @@ jobs:
       - name: Assert every vendorable file still exists
         run: npm run vendor:check
 
+      - name: Test EASM configuration, approval, transport, and reconciliation safety
+        run: npm run test:easm
+
+  portal:
+    name: Portal and API validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            api/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: api
+      - run: npm run portal:test
+      - run: npm run api:test
+      - run: npm run api:build
+
   shell:
     name: Shell syntax
     runs-on: ubuntu-latest
@@ -76,10 +99,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
       - name: Compile every Bicep module
         run: |
           shopt -s nullglob globstar
-          files=(modules/**/*.bicep platform/**/*.bicep)
+          files=(modules/**/*.bicep platform/**/*.bicep infra/portal/**/*.bicep)
           if [ ${#files[@]} -eq 0 ]; then
             echo "No Bicep modules to compile."
             exit 0
@@ -89,7 +116,13 @@ jobs:
           for file in "${files[@]}"; do
             echo "compiling $file"
             log="$(mktemp)"
-            az bicep build --file "$file" --outfile /dev/null 2> "$log" || failed=1
+            output=/dev/null
+            if [[ "$file" == platform/org.bicep ]]; then
+              output="$RUNNER_TEMP/pawprint-org.json"
+            elif [[ "$file" == infra/portal/main.bicep ]]; then
+              output="$RUNNER_TEMP/pawprint-portal.json"
+            fi
+            az bicep build --file "$file" --outfile "$output" 2> "$log" || failed=1
             # This repository publishes the ruleset, so a warning here would ship
             # to every consumer as a warning they cannot fix.
             if grep -E ': (Warning|Error) ' "$log"; then
@@ -97,4 +130,13 @@ jobs:
               failed=1
             fi
           done
-          exit $failed
+          if [[ "$failed" != 0 ]]; then exit "$failed"; fi
+          node scripts/check-easm-infra.mjs "$RUNNER_TEMP/pawprint-org.json"
+          for environment in dev prod; do
+            az bicep build-params --file "platform/org.$environment.bicepparam" \
+              --outfile "$RUNNER_TEMP/pawprint-org-$environment.parameters.json"
+          done
+          az bicep build-params --file infra/portal/main.dev.bicepparam \
+            --outfile "$RUNNER_TEMP/pawprint-portal.parameters.json"
+          node scripts/check-portal-infra.mjs \
+            "$RUNNER_TEMP/pawprint-portal.json" "$RUNNER_TEMP/pawprint-portal.parameters.json"

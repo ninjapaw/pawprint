@@ -1,0 +1,16 @@
+{
+  "subscriptions": {},
+  "bindings": {
+    "shared-easm": {
+      "dev": { "desired": "disabled", "resourceIds": [] },
+      "prod": { "desired": "disabled", "resourceIds": [] }
+    },
+    "shared-monitoring": {
+      "dev": { "desired": "not-configured", "resourceIds": [] },
+      "prod": { "desired": "not-configured", "resourceIds": [] }
+    },
+    "platform-key-vault": {
+      "dev": { "desired": "not-configured", "resourceIds": [] }
+    }
+  }
+}

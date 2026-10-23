@@ -1,0 +1,13 @@
+{
+  "configVersion": "1.0.0",
+  "key": "ninjapaw-shared",
+  "enabled": false,
+  "environment": "prod",
+  "workspaceName": "easm-np-platform-centralus",
+  "location": "centralus",
+  "protectFromDeletion": true,
+  "accessBindings": [],
+  "budget": null,
+  "authorizedDomains": [],
+  "discoveryGroups": []
+}

@@ -1,0 +1,736 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PawPrint server-only observation bindings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subscriptions",
+    "bindings"
+  ],
+  "properties": {
+    "subscriptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dev": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "prod": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shared-easm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                },
+                "budgetResourceId": {
+                  "type": "string",
+                  "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft[.]Consumption/budgets/[a-zA-Z0-9._()-]+$"
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                },
+                "budgetResourceId": {
+                  "type": "string",
+                  "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft[.]Consumption/budgets/[a-zA-Z0-9._()-]+$"
+                }
+              }
+            }
+          }
+        },
+        "external-dns": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "shared-monitoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "platform-key-vault": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pawprint-portal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pawton": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "php2shell-cloud-defense-dojo": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "code-to-cloud-security-dojo": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "m365profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sentinel-optimizer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ninjapaws-cloud-security-dojo": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dev": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            },
+            "prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "desired",
+                "resourceIds"
+              ],
+              "properties": {
+                "desired": {
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "not-configured"
+                  ]
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[a-zA-Z0-9._()-]+/providers/[a-zA-Z.]+/[a-zA-Z]+/[a-zA-Z0-9._()-]+$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

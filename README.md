@@ -28,6 +28,16 @@ record of what was deployed, asserted, and observed.
 | `.github/workflows/kit-*.yml` | Reusable validation, Defender posture, promotion, and cleanup workflows    |
 | `samples/`                    | Reference scenario and pawprint fixtures                                   |
 
+For an HTTPS PHP origin behind managed Azure WAF, compose the
+[Front Door WAF modules](modules/front-door-waf/README.md) with
+[`modules/php-web-app/main.bicep`](modules/php-web-app/main.bicep). These opt-in
+modules create no Defender subscriptions or runtime role grants. They support
+the disposable `php2shell-cloud-defense-dojo` scenario and are registered in the
+vendor manifest so consumers can check shared-source drift.
+The monitoring module retains its existing connection-string output by default;
+diagnostics-only consumers can set `emitApplicationInsightsConnectionString` to
+`false` so that deployment outputs contain no connection material.
+
 ## Quick start
 
 Requirements: Node.js 22.12+, npm, Azure CLI for Azure operations, and GitHub
@@ -400,15 +410,23 @@ live, so a change to a convention is made once rather than in every repository.
 | `modules/monitoring`                | Log Analytics and Application Insights for an ephemeral run   |
 | `modules/naming`                    | The resource naming convention                                |
 
-`scripts/connect-cloudflare-dns.sh` is the matching external-DNS connector. It
-reconciles only the Azure verification TXT record and application CNAME, using
-an account-owned Cloudflare service token restricted to one zone and supplied
-at runtime. Azure continues to own the application and managed certificate; no
-Cloudflare account or proxy features are provisioned.
+[`scripts/cloudflare-dns.mjs`](scripts/cloudflare-dns.mjs) is the shared
+external-DNS reconciler for Static Web Apps, App Service, Front Door, and
+explicitly declared platform records. The
+[`scripts/connect-cloudflare-dns.sh`](scripts/connect-cloudflare-dns.sh)
+adapter handles the Static Web Apps Azure validation sequence. New records are
+ownership-labelled; only the same repository/environment/run may update them.
+Equivalent legacy records are preserved, and conflicts fail before DNS writes.
+Tokens are zone-scoped runtime secrets. Azure continues to own application
+bindings and managed certificates; no Cloudflare account or proxy features
+are provisioned. Shared application records are not duplicated across repos.
 See [External DNS ownership](docs/external-dns.md) for the Bicep boundary,
 provider extension contract, fork behavior, and guided setup flow. Run
 `npm run portal`, then open `http://127.0.0.1:4173/setup/cloudflare/` to connect
 the optional Cloudflare provider without passing its token through a shell.
+Static-site DNS deployment is a separate manual opt-in. DNS-only snapshots keep
+consumer core-kit pins intact and are checked with `npm run vendor:check:dns`;
+Pawton and the PHP dojo use the same provider logic for their own Azure services.
 
 The local portal also exposes `http://127.0.0.1:4173/setup/platform/` for a
 read-only-first inventory of Defender for Cloud, Entra gallery, GitHub
@@ -480,6 +498,109 @@ az deployment sub create \
 
 Dev and production live in separate subscriptions, so there is one platform
 resource group per environment rather than one for the organisation.
+
+### Shared Defender External Attack Surface Management
+
+[`platform/org-easm.bicep`](platform/org-easm.bicep) adds a long-lived
+**Microsoft Defender EASM** workspace to the shared platform resource group.
+Enable it through `deployEasm` in [the organisation baseline](platform/org.bicep),
+not in individual repositories or disposable dojo groups. Both shipped
+environment parameter files keep it **off by default**. Normally choose one
+primary shared/security environment for the organisation's inventory; deploying
+overlapping inventories in dev and prod can duplicate discovery and billing.
+
+The recommended, configuration-driven rollout is documented in
+[Shared EASM operations](docs/easm.md). It adds workspace-only Reader/Contributor
+bindings, an EASM-filtered monthly budget, optional deletion protection,
+declarative discovery groups, and explicitly approved one-time runs.
+[The manual OIDC workflow](.github/workflows/shared-easm.yml) starts with an
+offline plan; it never deploys or scans on a push or schedule. Budget amount,
+contacts, identities, authorized domains, tier and recurrence remain operator
+inputs, not invented defaults.
+
+The workspace uses `Microsoft.Easm/workspaces@2023-04-01-preview`, currently the
+latest published workspace ARM API; Microsoft exposes no stable workspace API.
+`easmLocation` is independent of the platform group's metadata location and
+defaults to `location`. Current Microsoft guidance lists `centralus` among the
+supported regions, but confirm availability and data residency for your target
+subscription before enabling it. `easmWorkspaceName` controls the resource name.
+
+Provisioning needs:
+
+- An explicitly approved Azure subscription in the tenant that will own EASM.
+  EASM does not support cross-tenant access through Azure Lighthouse.
+- `Microsoft.Easm` provider registration, performed explicitly by an authorized
+  subscription operator if needed. The scoped deployment identity needs shared
+  resource-group deployment/EASM write rights, plus subscription deployment
+  record permissions for this subscription-scope baseline. First-time group
+  creation also needs the corresponding operator permission. Optional
+  `easmAccessBindings` need role-assignment write rights and grant only Reader
+  or Contributor on the workspace. Optional locks and budgets require their
+  corresponding scoped authorization/cost-management permissions.
+- Approval for ongoing **billable assets** and a budget/alert owner. Microsoft
+  documents a 30-day trial for the first EASM resource, followed by automatic
+  usage billing. Do not assume trial eligibility or treat budget alerts as a
+  spending stop. Approved host:IP combinations, domains and IP addresses can
+  contribute to billing; no fixed price or asset-count cap is invented here.
+- An owner for authorized discovery seeds, recurrence, inventory review, and
+  triage. The workspace ARM API has no writable discovery-group or seed
+  properties; the guarded data-plane reconciler performs this separate
+  onboarding from a validated manifest. A provisioned workspace is **not**
+  proof of discovery, findings, or coverage.
+
+Preview and deploy only after selecting the authorized subscription, confirming
+the advertised workspace regions, and reviewing cost/scope. From Pawprint in
+PowerShell:
+
+These lower-level baseline examples preserve the original minimal defaults.
+Use the recommended guide/workflow to require a real budget and verify all
+selected governance controls before configuring discovery.
+
+```powershell
+az provider show --subscription $env:AZURE_SUBSCRIPTION_ID --namespace Microsoft.Easm --query "resourceTypes[?resourceType=='workspaces'].locations | [0]" --output json
+# Only an authorized operator should register the provider if required:
+az provider register --subscription $env:AZURE_SUBSCRIPTION_ID --namespace Microsoft.Easm --wait
+az deployment sub what-if --subscription $env:AZURE_SUBSCRIPTION_ID --location centralus --template-file platform\org.bicep --parameters platform\org.prod.bicepparam deployEasm=true
+# Apply the same reviewed inputs only after approval:
+az deployment sub create --subscription $env:AZURE_SUBSCRIPTION_ID --location centralus --template-file platform\org.bicep --parameters platform\org.prod.bicepparam deployEasm=true
+```
+
+The preview also includes the baseline's shared monitoring and any other
+explicitly enabled platform components. Review the whole change set.
+`easmWorkspaceId`, `easmWorkspaceName`, and the service-returned
+`easmDataPlaneEndpoint` are non-secret outputs when enabled. Authenticate with
+Microsoft Entra; no API key, Cloudflare token, Key Vault, or runtime managed
+identity is required by this module. EASM creation does not enable Defender
+CSPM, change `Microsoft.Security/pricings`, alter DNS, or modify WAF.
+
+After deployment, verify `provisioningState` and the endpoint with
+`az resource show --ids <easmWorkspaceId> --api-version 2023-04-01-preview`.
+Then onboard only authorized assets in EASM and verify discovery completes.
+The existing zones `ninjapaws.org`, `m365profiles.com`, and
+`sentineloptimizer.com` are **seed candidates requiring ownership/authorization
+confirmation**, not automatically approved inventory. Do not seed Cloudflare's
+global IP ranges or Azure's shared provider root domains as if you own them.
+Review third-party infrastructure as dependencies, not automatically owned
+assets. Keep Reader access read-only and scope inventory operators' access to
+the EASM workspace in its owning tenant.
+
+The shared workspace has no scenario expiry/run tags and is not a workload
+teardown target. Setting `deployEasm=false` later **does not delete or suspend**
+an existing workspace in an incremental deployment or stop ongoing billing.
+Decommission deliberately, protect other shared resources, and verify billing
+afterward. Deleting an EASM resource cannot be undone by restoring the resource.
+CI compiles both environment parameter files and checks the compiled EASM
+contract with `npm run infra:check:easm -- <compiled-org.json>`.
+The additional `easmAccessBindings`, nullable `easmBudget`, and
+`easmProtectFromDeletion` inputs remain empty/off in the baseline; the recommended
+operator configuration selects them explicitly. Incremental deployment does
+not revoke omitted grants or remove existing budgets/locks. The CLI refuses
+silently retained managed grants and omitted managed discovery groups.
+
+References: [workspace deployment and regions](https://learn.microsoft.com/azure/external-attack-surface-management/deploying-the-defender-easm-azure-resource),
+[ARM/Bicep schema](https://learn.microsoft.com/azure/templates/microsoft.easm/workspaces),
+[billable assets](https://learn.microsoft.com/azure/external-attack-surface-management/understanding-billable-assets),
+and [discovery onboarding](https://learn.microsoft.com/azure/external-attack-surface-management/what-is-discovery).
 
 ### The Defender DevOps connector is platform, and is not infrastructure as code
 
@@ -567,7 +688,7 @@ npm run platform:status -- --environment prod \
    once for the organisation; everything else is per environment.
 2. **Platform resource group.** `az deployment sub create --template-file
 platform/org.bicep --parameters platform/org.<env>.bicepparam`. Shared
-   monitoring, and optionally the tier 0 vault and DNS zones.
+   monitoring, and optionally the tier 0 vault, Defender EASM, and DNS zones.
 3. **Per repository and environment.** `npm run onboard -- --repo <org/repo>
 --environment <env> --subscription <id> --resource-group <rg>`. Creates the
    application, the federated credential, the role assignments and the

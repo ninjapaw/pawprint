@@ -43,6 +43,12 @@ const setupOverview = {
   },
   azure: { subscription: "NinjaPaws Dev", keyVault: "np-pawprint-dev-kv" },
   app: { slug: null, enabled: false, installed: false },
+  cloudflare: {
+    zoneName: "ninjapaws.org",
+    environments: { dev: false, prod: false },
+    tokenExpiresOn: null,
+    workflowReady: false,
+  },
 };
 
 test.beforeEach(async ({ page }) => {
@@ -51,6 +57,9 @@ test.beforeEach(async ({ page }) => {
   );
   await page.route("**/api/setup/overview", (route) =>
     route.fulfill({ json: setupOverview }),
+  );
+  await page.route("**/api/shared/status?environment=*", (route) =>
+    route.fulfill({ status: 503, json: { error: "Synthetic legacy controller: shared workforce setup is not configured." } }),
   );
   await page.goto("/");
 });

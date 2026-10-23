@@ -1,0 +1,79 @@
+{
+  "services": [
+    {
+      "id": "shared-easm",
+      "label": "External attack surface",
+      "description": "Shared Defender EASM. Discovery and coverage are not inferred from provisioning or workflow success.",
+      "kind": "easm",
+      "resourceTypes": ["Microsoft.Easm/workspaces"],
+      "repository": "ninjapaw/pawprint",
+      "statusWorkflow": "shared-easm.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/easm.md"
+    },
+    {
+      "id": "external-dns",
+      "label": "External DNS · Cloudflare",
+      "description": "Public DNS observations only. No account access, token storage, ownership assertion, or hosted DNS writes.",
+      "kind": "dns",
+      "resourceTypes": [],
+      "zones": ["ninjapaws.org", "m365profiles.com", "sentineloptimizer.com"],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/external-dns.md"
+    },
+    {
+      "id": "shared-monitoring",
+      "label": "Shared monitoring",
+      "description": "Explicitly bound Log Analytics and Application Insights resources. No log contents are exposed.",
+      "kind": "monitoring",
+      "resourceTypes": ["Microsoft.OperationalInsights/workspaces", "Microsoft.Insights/components"],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md"
+    },
+    {
+      "id": "platform-key-vault",
+      "label": "Platform Key Vault",
+      "description": "Resource metadata only. The console never reads or edits platform secrets.",
+      "kind": "vault",
+      "resourceTypes": ["Microsoft.KeyVault/vaults"],
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md"
+    },
+    {
+      "id": "pawprint-portal",
+      "label": "PawPrint portal / API",
+      "description": "Existing Static Web App and linked Functions. API health is separate from Azure resource availability.",
+      "kind": "portal",
+      "resourceTypes": ["Microsoft.Web/staticSites", "Microsoft.Web/sites"],
+      "repository": "ninjapaw/pawprint",
+      "statusWorkflow": "deploy-portal-api.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawprint/blob/main/docs/portal-operations.md"
+    },
+    {
+      "id": "pawton",
+      "label": "Pawton",
+      "description": "Training workload. Workflow results are not live health. Doctor can invoke a write-capable Defender posture audit; use the protected workflow.",
+      "kind": "workload",
+      "resourceTypes": ["Microsoft.Web/sites"],
+      "repository": "ninjapaw/pawton",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/pawton/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "php2shell-cloud-defense-dojo",
+      "label": "PHP cloud defense dojo",
+      "description": "Training workload with explicit subscription and lab suffix requirements. No hosted deploy, paid protection or DNS actions.",
+      "kind": "workload",
+      "resourceTypes": ["Microsoft.Web/sites"],
+      "repository": "ninjapaw/php2shell-cloud-defense-dojo",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/php2shell-cloud-defense-dojo/actions/workflows/deploy.yml"
+    },
+    {
+      "id": "code-to-cloud-security-dojo",
+      "label": "Code-to-Cloud security dojo",
+      "description": "Status and protected workflow links only. Builds, cost gates and reviewed release confirmations are not bypassed.",
+      "kind": "workload",
+      "resourceTypes": ["Microsoft.Web/sites", "Microsoft.App/containerApps"],
+      "repository": "ninjapaw/code-to-cloud-security-dojo",
+      "statusWorkflow": "deploy.yml",
+      "guideUrl": "https://github.com/ninjapaw/code-to-cloud-security-dojo/actions/workflows/deploy.yml"
+    }
+  ]
+}

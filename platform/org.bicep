@@ -1,6 +1,8 @@
-metadata description = 'Subscription-scope organisation baseline. Holds what is genuinely shared and long-lived: one Log Analytics workspace, the tier 0 Key Vault for cross-cutting bootstrap secrets, and optionally the DNS zones. Workload resources never go here; each service keeps its own resource group so its blast radius and its teardown stay its own.'
+metadata description = 'Subscription-scope organisation baseline. Holds what is genuinely shared and long-lived: shared monitoring and optional tier 0 Key Vault, Defender EASM workspace, and DNS zones. Workload resources never go here; each service keeps its own resource group so its blast radius and its teardown stay its own.'
 
 targetScope = 'subscription'
+
+import { easmAccessBinding, easmBudgetConfig } from './org-easm.bicep'
 
 @description('Resource group holding the shared platform. One per environment, because dev and prod live in different subscriptions.')
 @minLength(1)
@@ -40,6 +42,25 @@ param keyVaultName string = ''
 
 @description('Principal IDs granted Key Vault Secrets Officer on the tier 0 vault. This is the rotation role and should be the platform deployment identity only; workloads get per-secret grants instead.')
 param keyVaultAdminPrincipalIds string[] = []
+
+@description('EXPLICIT BILLABLE Defender EASM workspace opt-in. False does not delete an existing workspace or stop its billing in an incremental deployment.')
+param deployEasm bool = false
+
+@description('Approved Defender EASM data-residency region. Defaults to the platform region; verify current Microsoft.Easm availability before enabling.')
+param easmLocation string = location
+
+@description('Shared Defender EASM workspace name. Normally enable one primary organisational inventory, not one workspace per repository.')
+@minLength(1)
+param easmWorkspaceName string = 'easm-np-platform-${environmentName}-${easmLocation}'
+
+@description('Optional least-privilege Reader/Contributor bindings on the shared EASM workspace only.')
+param easmAccessBindings easmAccessBinding[] = []
+
+@description('Optional resource-filtered monthly EASM budget and contact emails. No financial amount or recipients are assumed.')
+param easmBudget easmBudgetConfig?
+
+@description('Optional CanNotDelete lock on the shared EASM workspace. False does not remove a previously deployed lock.')
+param easmProtectFromDeletion bool = false
 
 @description('Public DNS zones to host in Azure. Leave empty when DNS is hosted elsewhere, which is the current arrangement.')
 param dnsZoneNames string[] = []
@@ -98,6 +119,18 @@ module dnsZones 'org-dns.bicep' = if (!empty(dnsZoneNames)) {
   }
 }
 
+module easm 'org-easm.bicep' = if (deployEasm) {
+  scope: platformResourceGroup
+  params: {
+    workspaceName: easmWorkspaceName
+    location: easmLocation
+    tags: platformTags
+    accessBindings: easmAccessBindings
+    budgetConfig: easmBudget
+    protectFromDeletion: easmProtectFromDeletion
+  }
+}
+
 @description('Platform resource group name.')
 output resourceGroupName string = platformResourceGroup.name
 
@@ -112,3 +145,12 @@ output platformKeyVaultName string = deployPlatformKeyVault ? platformKeyVault!.
 
 @description('Tier 0 Key Vault URI, empty when it was not deployed.')
 output platformKeyVaultUri string = deployPlatformKeyVault ? platformKeyVault!.outputs.keyVaultUri : ''
+
+@description('Shared Defender EASM workspace resource id, empty when this deployment does not manage EASM.')
+output easmWorkspaceId string = deployEasm ? easm!.outputs.workspaceId : ''
+
+@description('Shared Defender EASM workspace name, empty when this deployment does not manage EASM.')
+output easmWorkspaceName string = deployEasm ? easm!.outputs.workspaceName : ''
+
+@description('Service-returned EASM data-plane endpoint, empty when this deployment does not manage EASM. Authenticate with Entra; no token is emitted.')
+output easmDataPlaneEndpoint string = deployEasm ? easm!.outputs.dataPlaneEndpoint : ''

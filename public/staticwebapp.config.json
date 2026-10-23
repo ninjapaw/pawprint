@@ -9,6 +9,14 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/shared/roles",
+      "statusCode": 404
+    },
+    {
+      "route": "/api/shared/*",
+      "allowedRoles": ["reader", "operator", "admin"]
+    },
+    {
       "route": "/api/admin/*",
       "allowedRoles": ["admin"]
     },
@@ -40,7 +48,7 @@
     }
   },
   "globalHeaders": {
-    "Content-Security-Policy": "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.github.com; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "Content-Security-Policy": "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",

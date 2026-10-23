@@ -1,0 +1,54 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const bicep = process.env.BICEP_BINARY_PATH || "bicep";
+const compile = (args) => JSON.parse(execFileSync(bicep, args, { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }));
+const files = process.argv.slice(2);
+assert(files.length === 0 || files.length === 2, "Supply both compiled portal template and parameter report paths, or neither.");
+const template = files.length ? JSON.parse(readFileSync(files[0], "utf8")) : compile(["build", "infra/portal/main.bicep", "--stdout"]);
+const parameterResult = files.length ? JSON.parse(readFileSync(files[1], "utf8")) : compile(["build-params", "infra/portal/main.dev.bicepparam", "--stdout"]);
+const nodeVersionFile = readFileSync(resolve(root, ".node-version"), "utf8");
+const nodeVersion = nodeVersionFile.trim();
+assert(/^[1-9][0-9]*\.[0-9]+\.[0-9]+$/.test(nodeVersion), "The portal runtime must use a pinned Node version.");
+for (const path of ["package.json", "api/package.json"]) {
+  assert.equal(JSON.parse(readFileSync(resolve(root, path), "utf8")).engines.node, nodeVersion);
+}
+const resources = Object.values(template.resources);
+const modules = resources.filter((resource) => resource.type === "Microsoft.Resources/deployments");
+const api = modules.find((resource) => resource.name === "pawprint-portal-api").properties.template;
+const apiResources = Object.values(api.resources);
+const functionApp = apiResources.find((resource) => resource.type === "Microsoft.Web/sites");
+const account = apiResources.find((resource) => resource.type === "Microsoft.Storage/storageAccounts");
+assert.equal(functionApp.properties.functionAppConfig.runtime.name, "node");
+assert.equal(functionApp.properties.functionAppConfig.runtime.version, "[variables('nodeRuntimeVersion')]");
+const loadedPin = Object.keys(api.variables).find((name) => api.variables[name] === nodeVersionFile);
+assert(loadedPin, "The compiled Function template must contain the repository Node pin.");
+assert.equal(api.variables.nodeRuntimeVersion, `[split(trim(variables('${loadedPin}')), '.')[0]]`);
+assert.equal(functionApp.properties.functionAppConfig.scaleAndConcurrency.instanceMemoryMB, 512);
+assert.deepEqual(functionApp.properties.functionAppConfig.scaleAndConcurrency.alwaysReady, []);
+assert.equal(account.sku.name, "Standard_LRS");
+assert.equal(account.properties.allowSharedKeyAccess, false);
+assert.equal(account.properties.allowBlobPublicAccess, false);
+assert.match(JSON.stringify(account.tags), /SecurityControl|Ignore/);
+assert.equal(api.parameters.enableOperationRecords.defaultValue, false);
+assert.equal(api.parameters.sharedActionsEnabled.defaultValue, false);
+assert.equal(template.parameters.enableBackendVerification.defaultValue, false);
+assert.deepEqual(template.parameters.observationResourceGroups.defaultValue, []);
+const records = apiResources.find((resource) => resource.type.endsWith("/containers") && resource.name.includes("portal-operation-records"));
+assert(records.condition);
+assert.equal(records.properties.publicAccess, "None");
+assert(!apiResources.some((resource) => resource.type === "Microsoft.Storage/storageAccounts/managementPolicies"));
+const authentication = apiResources.find((resource) => resource.type === "Microsoft.Web/sites/config" && resource.name.includes("authsettingsV2"));
+assert.equal(authentication.properties.globalValidation.requireAuthentication, true);
+assert.equal(authentication.properties.globalValidation.unauthenticatedClientAction, "Return401");
+assert.deepEqual(authentication.properties.globalValidation.excludedPaths, ["/api/health"]);
+assert.equal(authentication.properties.identityProviders.azureStaticWebApps.enabled, true);
+const parameters = typeof parameterResult.parametersJson === "string"
+  ? JSON.parse(parameterResult.parametersJson).parameters : parameterResult.parameters;
+assert.equal(parameters.siteSkuName.value, "Standard");
+assert.equal(parameters.githubAppEnabled.value, false);
+console.log(`Portal Bicep + dev parameters verified: reuse Standard/Flex, Node ${nodeVersion.split(".")[0]}, no always-ready instances, private existing LRS records optional, new requests/scopes default off.`);

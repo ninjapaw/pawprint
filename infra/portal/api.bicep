@@ -33,6 +33,21 @@ param logAnalyticsWorkspaceId string
 @description('Object ID of the GitHub OIDC identity used only for Function code publication.')
 param deploymentPrincipalId string
 
+param allowedOrigin string = 'https://jolly-desert-067886210.3.azurestaticapps.net'
+param staticSiteResourceId string = ''
+param linkedBackendClientId string = ''
+param enableBackendVerification bool = false
+param workforceEnabled bool = false
+param entraTenantId string = ''
+param entraClientId string = ''
+param portalSources object = {
+  subscriptions: {}
+  bindings: {}
+}
+param enableOperationRecords bool = false
+param sharedActionsEnabled bool = false
+param easmReviewedEnvironments string = ''
+
 var tags = {
   application: 'pawprint-portal'
   component: 'api'
@@ -43,6 +58,7 @@ var tags = {
 }
 var storageAccountName = take('st${uniqueString(resourceGroup().id, functionAppName)}', 24)
 var deploymentContainerName = 'function-releases'
+var nodeRuntimeVersion = split(trim(loadTextContent('../../.node-version')), '.')[0]
 var githubAppSettings = githubAppEnabled ? [
   {
     name: 'GITHUB_APP_ENABLED'
@@ -103,6 +119,14 @@ resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/con
   }
 }
 
+resource operationRecords 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = if (enableOperationRecords) {
+  parent: blobService
+  name: 'portal-operation-records'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource flexPlan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: '${functionAppName}-plan'
   location: location
@@ -142,7 +166,7 @@ resource functionApp 'Microsoft.Web/sites@2025-03-01' = {
       }
       runtime: {
         name: 'node'
-        version: '22'
+        version: nodeRuntimeVersion
       }
       scaleAndConcurrency: {
         instanceMemoryMB: 512
@@ -170,13 +194,90 @@ resource functionApp 'Microsoft.Web/sites@2025-03-01' = {
         }
         {
           name: 'PORTAL_ALLOWED_ORIGIN'
-          value: 'https://jolly-desert-067886210.3.azurestaticapps.net'
+          value: allowedOrigin
+        }
+        {
+          name: 'PORTAL_BACKEND_RESOURCE_ID'
+          value: resourceId('Microsoft.Web/sites', functionAppName)
+        }
+        {
+          name: 'PORTAL_STATIC_SITE_RESOURCE_ID'
+          value: staticSiteResourceId
+        }
+        {
+          name: 'PORTAL_LINKED_BACKEND_CLIENT_ID'
+          value: linkedBackendClientId
+        }
+        {
+          name: 'PORTAL_AUTH_MODE'
+          value: workforceEnabled ? 'workforce' : 'legacy'
+        }
+        {
+          name: 'PORTAL_ENTRA_TENANT_ID'
+          value: entraTenantId
+        }
+        {
+          name: 'PORTAL_ENTRA_CLIENT_ID'
+          value: entraClientId
+        }
+        {
+          name: 'PORTAL_SOURCES_JSON'
+          value: string(portalSources)
+        }
+        {
+          name: 'PORTAL_ACTION_RECORDS_BLOB_ENDPOINT'
+          value: enableOperationRecords ? storageAccount.properties.primaryEndpoints.blob : ''
+        }
+        {
+          name: 'PORTAL_SHARED_ACTIONS_ENABLED'
+          value: string(sharedActionsEnabled)
+        }
+        {
+          name: 'PORTAL_EASM_REVIEWED_ENVIRONMENTS'
+          value: easmReviewedEnvironments
         }
       ], githubAppSettings)
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       http20Enabled: true
     }
+  }
+}
+
+resource linkedOnlyAuthentication 'Microsoft.Web/sites/config@2025-03-01' = if (!empty(linkedBackendClientId)) {
+  parent: functionApp
+  name: 'authsettingsV2'
+  properties: {
+    platform: {
+      enabled: true
+      runtimeVersion: '~1'
+    }
+    globalValidation: {
+      requireAuthentication: true
+      unauthenticatedClientAction: 'Return401'
+      excludedPaths: ['/api/health']
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    identityProviders: {
+      azureStaticWebApps: {
+        enabled: true
+        registration: {
+          clientId: linkedBackendClientId
+        }
+      }
+    }
+  }
+}
+
+resource configurationReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableBackendVerification) {
+  name: guid(functionApp.id, 'portal-auth-read')
+  scope: functionApp
+  properties: {
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
   }
 }
 

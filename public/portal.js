@@ -131,16 +131,13 @@ async function hostedOverview() {
       githubAppConfigured = Boolean((await status.json()).githubAppConfigured);
     }
   }
-  const workloads = await Promise.all(
-    definition.workloads.map(async (workload) => {
-      const endpoint = `https://api.github.com/repos/${workload.repository}/actions/workflows/${workload.statusWorkflow}/runs?branch=dev&per_page=1`;
-      const response = await fetch(endpoint, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      const payload = response.ok
-        ? await response.json()
-        : { workflow_runs: [] };
-      const run = payload.workflow_runs[0];
+  const statusResponse = await fetch("/api/shared/status?environment=dev", {
+    headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000),
+  });
+  const shared = statusResponse.ok && statusResponse.headers.get("content-type")?.includes("application/json")
+    ? await statusResponse.json() : null;
+  const workloads = definition.workloads.map((workload) => {
+      const run = shared?.services?.find((service) => service.id === workload.id)?.workflow?.runs?.[0];
       return {
         ...workload,
         environment: "dev",
@@ -149,24 +146,27 @@ async function hostedOverview() {
           ? {
               status: run.status,
               conclusion: run.conclusion,
-              createdAt: run.created_at,
-              url: run.html_url,
+              createdAt: run.createdAt,
+              url: run.url,
             }
           : null,
       };
-    }),
-  );
+    });
   return {
     canDeploy: hostedAdmin && githubAppConfigured,
     hostedAdmin,
     githubAppConfigured,
     principal,
     workloads,
+    hostedSourcesAvailable: shared !== null,
     jobs: [],
   };
 }
 
+let refreshInProgress = false;
 async function refresh() {
+  if (refreshInProgress || document.hidden) return;
+  refreshInProgress = true;
   try {
     setConnection("Refreshing", "online");
     const response = await fetch("/api/overview", {
@@ -187,24 +187,26 @@ async function refresh() {
         authLink.href = "/.auth/logout?post_logout_redirect_uri=/";
       }
       const mode = hosted.canDeploy
-        ? "Hosted admin ready"
+        ? "Legacy requests configured"
         : hosted.hostedAdmin
           ? "GitHub App setup required"
           : hosted.principal
             ? "Admin role required"
             : "Hosted read-only mode";
-      setConnection(mode, hosted.canDeploy ? "online" : "offline");
+      setConnection(mode, hosted.hostedSourcesAvailable ? "online" : "offline");
       document
         .querySelectorAll("[data-local-only]")
         .forEach((element) => (element.disabled = true));
       document.querySelector("[data-mode-copy]").textContent = hosted.canDeploy
-        ? "Hosted actions dispatch fixed development workflows through the dedicated PawPrint GitHub App."
-        : "Sign in with GitHub and use an assigned admin role, or open PawPrint Portal.cmd for local deployment actions.";
+        ? "Legacy requests use the dedicated App configuration. Installation readiness and run start are not implied. Shared-service requests use a separate verified boundary."
+        : "Use the configured identity provider with an assigned role, open protected GitHub workflows, or start PawPrint Portal.cmd for local controls. Missing observations are not healthy status.";
       document.querySelector("[data-local-setup]").hidden = true;
     } catch {
       setConnection("Deployment status unavailable", "offline");
       workloadGrid.innerHTML = `<p class="loading">Deployment status could not be loaded. Open GitHub Actions directly or start PawPrint Portal locally.</p>`;
     }
+  } finally {
+    refreshInProgress = false;
   }
 }
 
@@ -391,4 +393,5 @@ document.addEventListener("click", (event) => {
 });
 
 refresh();
-setInterval(refresh, 30000);
+setInterval(() => { if (!document.hidden) refresh(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });

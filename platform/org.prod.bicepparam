@@ -14,5 +14,13 @@ param deployPlatformKeyVault = false
 param keyVaultName = 'np-platform-kv'
 param keyVaultAdminPrincipalIds = []
 
+// Enable only after region, authorized discovery scope, and ongoing asset billing are approved.
+param deployEasm = false
+param easmWorkspaceName = 'easm-np-platform-centralus'
+param easmLocation = 'centralus'
+param easmAccessBindings = []
+param easmBudget = null
+param easmProtectFromDeletion = false
+
 // DNS is hosted externally today; adding zones here would move authority.
 param dnsZoneNames = []

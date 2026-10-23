@@ -3,6 +3,14 @@
   "manifestVersion": "1.0.0",
   "files": [
     {
+      "path": "LICENSE",
+      "description": "Upstream license and attribution, retained with vendored source."
+    },
+    {
+      "path": "bicepconfig.json",
+      "description": "Canonical Bicep lint and formatting rules."
+    },
+    {
       "path": "scripts/deploy-config.mjs",
       "description": "Resolves config/deploy.config.json into deployment environment variables."
     },
@@ -16,7 +24,16 @@
     },
     {
       "path": "scripts/connect-cloudflare-dns.sh",
-      "description": "Reconciles the minimal Cloudflare DNS records required by an Azure Static Web App custom domain."
+      "description": "Orchestrates Azure Static Web App domain validation using the shared Cloudflare DNS reconciler.",
+      "requires": ["scripts/cloudflare-dns.mjs"]
+    },
+    {
+      "path": "scripts/cloudflare-dns.mjs",
+      "description": "Shared, ownership-scoped Cloudflare record reconciliation for Azure custom domains and explicitly declared platform records."
+    },
+    {
+      "path": "scripts/vendor-sync.mjs",
+      "description": "Shared-source synchronization and offline verification of content-hashed vendor snapshots."
     },
     {
       "path": "scripts/audit-secrets.sh",
@@ -41,6 +58,26 @@
     {
       "path": "modules/naming/main.bicep",
       "description": "The resource naming convention."
+    },
+    {
+      "path": "modules/types.bicep",
+      "description": "Shared types required by vendored infrastructure modules."
+    },
+    {
+      "path": "modules/monitoring/main.bicep",
+      "description": "Capped Log Analytics workspace and linked Application Insights."
+    },
+    {
+      "path": "modules/front-door-waf/profile.bicep",
+      "description": "Front Door Premium profile identity, independent of origin routing."
+    },
+    {
+      "path": "modules/front-door-waf/main.bicep",
+      "description": "HTTPS Front Door routing, managed WAF, optional benign training marker, and diagnostics."
+    },
+    {
+      "path": "modules/php-web-app/main.bicep",
+      "description": "PHP App Service restricted to a specific Front Door profile, with managed identity and diagnostics."
     }
   ]
 }

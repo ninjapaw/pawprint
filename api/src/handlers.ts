@@ -1,7 +1,8 @@
-import type { HttpHandler, HttpResponseInit } from "@azure/functions";
-import { requireAdmin } from "./auth.js";
+import type { HttpHandler, HttpRequest, HttpResponseInit } from "@azure/functions";
+import { requireAdmin, sharedRole } from "./auth.js";
 import { dispatchWorkflow, githubConfiguration } from "./github.js";
 import { resolveWorkflow } from "./workloads.js";
+import { backendTrust } from "./trust.js";
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -13,6 +14,13 @@ const response = (status: number, body: unknown): HttpResponseInit => ({
   headers: jsonHeaders,
 });
 
+async function workforceBoundary(request: HttpRequest): Promise<HttpResponseInit | null> {
+  if (process.env.PORTAL_AUTH_MODE !== "workforce") return null;
+  if (sharedRole(request) !== "admin") return response(403, { error: "An explicitly assigned workforce Admin role is required." });
+  const trust = await backendTrust();
+  return trust.state === "verified" ? null : response(503, { state: "setup-required", error: trust.message });
+}
+
 export const health: HttpHandler = async () =>
   response(200, {
     status: "ok",
@@ -22,6 +30,8 @@ export const adminStatus: HttpHandler = async (request) => {
   const principal = requireAdmin(request);
   if (!principal)
     return response(403, { error: "The Pawprint admin role is required." });
+  const blocked = await workforceBoundary(request);
+  if (blocked) return blocked;
   return response(200, {
     status: "ok",
     githubAppConfigured: githubConfiguration() !== null,
@@ -34,6 +44,8 @@ export const dispatch: HttpHandler = async (request, context) => {
   const principal = requireAdmin(request);
   if (!principal)
     return response(403, { error: "The Pawprint admin role is required." });
+  const blocked = await workforceBoundary(request);
+  if (blocked) return blocked;
 
   const allowedOrigin = process.env.PORTAL_ALLOWED_ORIGIN?.trim();
   const contentType = request.headers
@@ -78,16 +90,14 @@ export const dispatch: HttpHandler = async (request, context) => {
       target.workflow.workflow,
       target.workflow.inputs,
     );
-    context.log(
-      `Hosted dispatch by ${principal.userDetails}: ${workload}/${step}`,
-    );
+    context.log(JSON.stringify({ event: "legacy-workflow-request", workload, step, environment: "dev" }));
     return response(202, {
-      message: `Started ${workload} ${step} deployment in dev.`,
+      message: `GitHub accepted the ${workload} ${step} request in dev. Run start or completion has not been verified.`,
     });
-  } catch (error) {
-    context.error("GitHub workflow dispatch failed", error);
+  } catch {
+    context.error("Legacy workflow request outcome is unavailable; inspect GitHub before retrying.");
     return response(502, {
-      error: "GitHub did not accept the workflow dispatch.",
+      error: "The GitHub request outcome could not be established. Inspect the protected workflow before retrying.",
     });
   }
 };
