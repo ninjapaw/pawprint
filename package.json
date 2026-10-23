@@ -61,7 +61,7 @@
   "dependencies": {
     "@lucide/astro": "1.38.0",
     "@octokit/auth-app": "^8.1.2",
-    "astro": "^7.1.1"
+    "astro": "^7.4.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
