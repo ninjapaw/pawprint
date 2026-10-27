@@ -160,11 +160,9 @@ jobs:
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/pawprint-portal-host.json"
-          az functionapp show \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            --resource-group "$PORTAL_RESOURCE_GROUP" \
-            --name "$PORTAL_FUNCTION_APP" \
-            --query '{id:id,hostName:defaultHostName,runtimeName:functionAppConfig.runtime.name,runtimeVersion:functionAppConfig.runtime.version}' \
+          az rest --method GET \
+            --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$PORTAL_RESOURCE_GROUP/providers/Microsoft.Web/sites/$PORTAL_FUNCTION_APP?api-version=2025-03-01" \
+            --query '{id:id,hostName:properties.defaultHostName,runtimeName:properties.functionAppConfig.runtime.name,runtimeVersion:properties.functionAppConfig.runtime.version}' \
             --output json > "$report"
           node scripts/check-portal-host.mjs "$report" >> "$GITHUB_OUTPUT"
       - name: Deploy Function App with One Deploy

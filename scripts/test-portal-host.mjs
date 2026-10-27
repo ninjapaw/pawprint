@@ -120,7 +120,10 @@ test("publication and direct-host verification consume the runtime-checked Azure
   const gate = workflow.indexOf("- name: Verify Function runtime before publication");
   const publish = workflow.indexOf("- name: Deploy Function App with One Deploy");
   assert.ok(gate >= 0 && gate < publish);
-  assert.match(workflow, /hostName:defaultHostName,runtimeName:functionAppConfig\.runtime\.name,runtimeVersion:functionAppConfig\.runtime\.version/);
+  assert.match(workflow, /az rest --method GET/);
+  assert.match(workflow, /Microsoft\.Web\/sites\/\$PORTAL_FUNCTION_APP\?api-version=2025-03-01/);
+  assert.match(workflow, /hostName:properties\.defaultHostName,runtimeName:properties\.functionAppConfig\.runtime\.name,runtimeVersion:properties\.functionAppConfig\.runtime\.version/);
+  assert.ok(!workflow.includes("az functionapp show"));
   assert.match(workflow, /node scripts\/check-portal-host\.mjs "\$report" >> "\$GITHUB_OUTPUT"/);
   assert.match(workflow, /PORTAL_API_ORIGIN: \$\{\{ steps\.publication-target\.outputs\.origin \}\}/);
   assert.match(workflow, /"\$PORTAL_API_ORIGIN\/api\/admin\/status"/);

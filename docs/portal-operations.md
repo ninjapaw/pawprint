@@ -77,6 +77,11 @@ deployment identity or publish to the development site. Pull-request CI instead
 runs the portal checks/build, API tests/build, and compiled portal IaC assertions
 without deployment credentials.
 
+Publication reads Flex runtime metadata through a read-only ARM request so CLI
+site-model projections cannot hide the runtime fields. The pinned Node major,
+exact Function resource and Azure-assigned hostname are still verified before
+code upload; missing or foreign metadata fails closed.
+
 ```powershell
 # Only after GitHub CLI has SSO-authorized access and the reviewed code is on main:
 gh workflow run deploy-portal-api.yml --repo ninjapaw/pawprint --ref main -f preview-only=true -f deploy-infrastructure=false
