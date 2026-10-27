@@ -2,7 +2,7 @@ name: Deploy Pawprint Portal
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - .github/workflows/deploy-portal.yml
       - .github/workflows/kit-deploy-static-site.yml
@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 20

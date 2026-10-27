@@ -3,10 +3,8 @@ name: Kit / Deploy static site
 # Reusable. Consumers pin an immutable ref (release tag or commit SHA):
 #   uses: ninjapaw/pawprint/.github/workflows/kit-deploy-static-site.yml@<immutable-ref>
 #
-# Resolves the target environment from the branch, refuses a branch and
-# environment that disagree, then builds and publishes to Azure Static Web Apps.
-# The branch-to-environment mapping is the deployment safety property here: it is
-# what stops a production publish from a feature branch.
+# Publishes only reviewed main code. Environment selection remains explicit;
+# automatic main pushes target prod, while a manual run can select dev.
 
 on:
   workflow_call:
@@ -85,27 +83,16 @@ jobs:
             exit 1
           fi
 
-          case "$BRANCH" in
-            main) detected=prod ;;
-            dev) detected=dev ;;
-            *) detected="" ;;
+          if [ "$BRANCH" != main ]; then
+            echo "::error title=Unsupported branch::Deploy from 'main', not '$BRANCH'."
+            exit 1
+          fi
+
+          case "${INPUT_ENVIRONMENT:-auto-detect}" in
+            auto-detect) environment=prod ;;
+            dev|prod) environment="$INPUT_ENVIRONMENT" ;;
+            *) echo "::error title=Invalid environment::Choose dev or prod."; exit 1 ;;
           esac
-
-          if [ -n "$INPUT_ENVIRONMENT" ] && [ "$INPUT_ENVIRONMENT" != "auto-detect" ]; then
-            environment="$INPUT_ENVIRONMENT"
-          elif [ -n "$detected" ]; then
-            environment="$detected"
-          else
-            echo "::error title=Unsupported branch::Cannot auto-detect an environment for '$BRANCH'. Deploy from 'dev' or 'main'."
-            exit 1
-          fi
-
-          # A dispatch that names an environment the branch does not map to is
-          # almost always a mistake, and always the expensive kind.
-          if [ -n "$detected" ] && [ "$environment" != "$detected" ]; then
-            echo "::error title=Branch and environment mismatch::Branch '$BRANCH' maps to $detected, not $environment."
-            exit 1
-          fi
 
           site_url="$(jq -r --arg env "$environment" '.environments[$env].publicSiteUrl // .defaults.publicSiteUrl // empty' "$CONFIG_FILE")"
           if [[ ! "$site_url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[^[:cntrl:]]*)?$ ]]; then

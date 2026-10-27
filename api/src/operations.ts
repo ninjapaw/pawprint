@@ -154,7 +154,7 @@ export async function createPreview(store: RecordStore, principal: ClientPrincip
   await store.create(record);
   return {
     ...publicRecord(record), action,
-    repository: "ninjapaw/pawprint", workflow: "shared-easm.yml", ref: environment === "prod" ? "main" : "dev",
+    repository: "ninjapaw/pawprint", workflow: "shared-easm.yml", ref: "main",
     notice: "This request uses the CURRENT protected Environment EASM_CONFIG_JSON, not a scope snapshot. Scopes, seeds, budgets and subscriptions cannot be edited here. GitHub approvals, cost and discovery gates still apply. Confirming requests a workflow; it does not prove that a run has started.",
   };
 }
@@ -192,7 +192,7 @@ export async function confirmRequest(
       await dispatchWorkflow(configuration, "ninjapaw/pawprint", "shared-easm.yml", {
         environment: record.environment, operation: record.actionId, request_id: record.requestId,
         approve_write: action.write ? "true" : "false", approve_discovery: action.discovery ? "true" : "false",
-      }, record.environment === "prod" ? "main" : "dev");
+      }, "main");
       state = "accepted";
     } catch (error) {
       const status = isRecord(error) ? error.status : undefined;
@@ -216,7 +216,7 @@ export async function requestStatus(store: RecordStore, principal: ClientPrincip
   const record = await store.read(requestId);
   if (!record) throw new OperationError(404, "Unknown operation request.");
   if (record.actorHash !== actorHash(principal)) throw new OperationError(403, "This request belongs to another operator.");
-  const workflow = await workflowObservation("ninjapaw/pawprint", "shared-easm.yml", record.environment === "prod" ? "main" : "dev");
+  const workflow = await workflowObservation("ninjapaw/pawprint", "shared-easm.yml", "main");
   const title = `Shared EASM - ${record.environment} - ${record.actionId} - ${record.requestId}`;
   return {
     ...publicRecord(record), workflow: { ...workflow, runs: workflow.runs.filter((run) => run.title === title) },

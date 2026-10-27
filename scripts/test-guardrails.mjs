@@ -59,8 +59,8 @@ const cases = [
     expect: /Major versions are not compatible|migrate/i,
   },
   {
-    name: "rejects a branch that does not own the requested environment",
-    args: () => ["--branch", "main", "--environment", "dev"],
+    name: "rejects the retired dev branch for the requested environment",
+    args: () => ["--branch", "dev", "--environment", "dev"],
     expect: /does not own environment/i,
   },
   {
@@ -131,7 +131,7 @@ for (const testCase of cases) {
 }
 
 // A positive control, so a resolver that rejects everything cannot pass this suite.
-const healthy = runResolver(["--environment", "dev", "--check"]);
+const healthy = runResolver(["--branch", "main", "--environment", "dev", "--check"]);
 if (healthy.code !== 0) {
   failures += 1;
   process.stderr.write(`FAIL  accepts the shipped default configuration\n      ${healthy.stderr.trim()}\n`);
@@ -140,6 +140,14 @@ if (healthy.code !== 0) {
 }
 
 // The allowlist must permit as well as refuse, otherwise it is just a wall.
+const main = runResolver(["--branch", "main", "--json"]);
+if (main.code !== 0 || JSON.parse(main.stdout).environment !== "prod") {
+  failures += 1;
+  process.stderr.write(`FAIL  main-only auto-detection selects prod\n      ${main.stderr.trim()}\n`);
+} else {
+  process.stdout.write("ok    main-only auto-detection selects prod\n");
+}
+
 const approvedPath = writeConfig("approved.json", {
   configVersion: "1.0.0",
   defaults: { approvedSubscriptions: ["16037566-d4df-4c7c-b484-346d8472b4c4"] },

@@ -71,15 +71,15 @@ The API workflow has an explicit `preview-only` input. When selected it
 validates/packages the source, authenticates with the infrastructure identity,
 and runs `what-if`, but never applies infrastructure or publishes API code.
 The existing automatic development publication behavior is unchanged.
-Both frontend and API deployment jobs are restricted to `refs/heads/dev`,
+Both frontend and API deployment jobs are restricted to `refs/heads/main`,
 including manual invocations. A feature-branch run cannot acquire the protected
 deployment identity or publish to the development site. Pull-request CI instead
 runs the portal checks/build, API tests/build, and compiled portal IaC assertions
 without deployment credentials.
 
 ```powershell
-# Only after GitHub CLI has SSO-authorized access and the reviewed code is on dev:
-gh workflow run deploy-portal-api.yml --repo ninjapaw/pawprint --ref dev -f preview-only=true -f deploy-infrastructure=false
+# Only after GitHub CLI has SSO-authorized access and the reviewed code is on main:
+gh workflow run deploy-portal-api.yml --repo ninjapaw/pawprint --ref main -f preview-only=true -f deploy-infrastructure=false
 ```
 
 Every infrastructure application now previews the same inputs first.
@@ -189,7 +189,7 @@ A preview is a deliberate operator action: it stores a small private record but 
 
 The server generates the UUID. Conditional Blob creation and a Blob lease provide cross-instance serialization. Before sending to GitHub, the API durably records `requesting`. A replay returns the same record; it does not dispatch again. A crash, timeout, ambiguous GitHub response or failed final persistence returns **uncertain**, never an automatic retry. Check the same request ID before any new intentional request.
 
-Only `shared-easm.yml` receives `request_id`; legacy workflows do not. The branch is fixed to `dev` for development and `main` for production. HTTP 202 means a request was accepted/recorded, **not** that a run started or completed. Correlation checks the fixed workflow/ref and exact `Shared EASM - <environment> - <operation> - <UUID>` title in the latest 50 runs. A missing match is not proof the run does not exist, and does not authorize replay.
+Only `shared-easm.yml` receives `request_id`; legacy workflows do not. The source branch is fixed to `main` for both deployment environments. General workflow feeds can include dev and prod runs; they are not environment-specific health. HTTP 202 means a request was accepted/recorded, **not** that a run started or completed. EASM correlation checks the fixed workflow/ref and exact `Shared EASM - <environment> - <operation> - <UUID>` title in the latest 50 runs. A missing match is not proof the run does not exist, and does not authorize replay.
 
 The activity feed shows workflow observations and the current browser session's requests. It is not a comprehensive audit-retention product. Private Blob records survive API instances; correlation can be checked with the known UUID. Logs contain UUID/action/environment/state, not tokens, private configuration or user identity. No secret value is fetched from GitHub or Cloudflare.
 

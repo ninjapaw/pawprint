@@ -8,7 +8,7 @@
   },
   "environments": {
     "dev": {
-      "branch": "dev",
+      "branch": "main",
       "subscriptionRef": "dev",
       "platformResourceGroup": "NP-Platform-Dev-CentralUS",
       "hostsDevOpsConnector": true

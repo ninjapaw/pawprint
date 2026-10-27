@@ -316,8 +316,8 @@ export async function executeEasm(mode, input, options = {}) {
     throw new Error(`Deployment blocked: ${deploymentBlockers(config).join(" ")}`);
   }
   if (DISCOVERY_WRITES.includes(mode) && !config.discoveryGroups.length) throw new Error("No discovery groups are declared; no discovery action can be applied.");
-  if (environment.EASM_SOURCE_REF && environment.EASM_SOURCE_REF !== (config.environment === "prod" ? "main" : "dev")) {
-    throw new Error("Cloud operations must use the branch matching the selected environment.");
+  if (environment.EASM_SOURCE_REF && environment.EASM_SOURCE_REF !== "main") {
+    throw new Error("Cloud operations must use the main branch and the selected protected environment.");
   }
   const subscription = environment.AZURE_SUBSCRIPTION_ID;
   const tenant = environment.AZURE_TENANT_ID;

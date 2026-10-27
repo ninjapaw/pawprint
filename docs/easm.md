@@ -88,8 +88,8 @@ non-cancelling concurrency. No push/PR/scheduled workflow deploys or scans.
 
 Create protected GitHub Environments with required reviewers and deployment
 branch restrictions. These approvals cannot be guaranteed by workflow YAML
-alone. Cloud actions require `main`/`prod` or `dev`/`dev`; configuration must match
-the selected environment.
+alone. Cloud actions require the `main` branch and an explicit `dev` or `prod`
+environment; configuration must match that protected environment.
 
 Set the following Environment configuration:
 

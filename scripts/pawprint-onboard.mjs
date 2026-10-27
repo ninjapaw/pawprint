@@ -37,7 +37,7 @@ const PAWPRINT_TAG = "pawprint-managed";
 const ISSUER = "https://token.actions.githubusercontent.com";
 const AUDIENCE = "api://AzureADTokenExchange";
 
-const BRANCH_FOR_ENVIRONMENT = { dev: "dev", prod: "main" };
+const BRANCH_FOR_ENVIRONMENT = { dev: "main", prod: "main" };
 
 const { values } = parseArgs({
   options: {

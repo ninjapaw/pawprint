@@ -84,7 +84,7 @@ import Disclaimer from "../../components/Disclaimer.astro";
           <div class="step-number">4</div>
           <div>
             <h2>Deploy and bind</h2>
-            <p>The Site workflow deploys Azure with Bicep, reconciles the two Cloudflare records, then converges the Azure custom-domain resource through Bicep before publishing the application. Review and push the workflow changes to the <strong>dev</strong> branch first; the button remains disabled until both the workflow and token are ready.</p>
+            <p>The Site workflow deploys Azure with Bicep, reconciles the two Cloudflare records, then converges the Azure custom-domain resource through Bicep before publishing the application. Review and merge the workflow changes to the <strong>main</strong> branch first; the button remains disabled until both the workflow and token are ready.</p>
             <button type="button" class="step-action deploy-action" data-cloudflare-deploy disabled><Rocket aria-hidden="true" size={16} /> Deploy Site</button>
           </div>
         </li>

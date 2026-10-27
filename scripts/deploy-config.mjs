@@ -1,6 +1,6 @@
 // Resolves config/deploy.config.json into the environment variables a deployment
 // pipeline consumes. Shared across repositories: the resolution order, the
-// branch-to-environment binding and the refusal to read a subscription id out of
+// main-only deployment policy and the refusal to read a subscription id out of
 // committed configuration are organisation policy, not per-repository detail.
 //
 // Repository-specific output is declarative. Put it in the config file under
@@ -26,7 +26,7 @@ const SECRET_SHAPED =
 // Only a key that would hold the secret itself is worth refusing.
 const SECRET_METADATA = /(names?|days|enabled|mode|tier|path|uri|url|count)$/i;
 
-const BRANCH_FOR_ENVIRONMENT = { dev: "dev", prod: "main" };
+const BRANCH_FOR_ENVIRONMENT = { dev: "main", prod: "main" };
 
 const BASE_ENV = {
   DEPLOY_ENVIRONMENT: "__environmentName",
@@ -115,16 +115,16 @@ function appendTo(variableName, content) {
 }
 
 function resolveEnvironment(requested, branch) {
+  if (branch && branch !== "main") {
+    fail(`Deploy from 'main', not '${branch}'.`);
+  }
   if (requested && requested !== "auto" && requested !== "auto-detect") {
     return requested;
   }
   if (branch === "main") {
     return "prod";
   }
-  if (branch === "dev") {
-    return "dev";
-  }
-  fail("Specify --environment dev|prod or --branch dev|main.");
+  fail("Specify --environment dev|prod or --branch main.");
 }
 
 function validate(root, name, resolved, requireSubscription) {
@@ -153,7 +153,7 @@ function validate(root, name, resolved, requireSubscription) {
   const expectedBranch = BRANCH_FOR_ENVIRONMENT[name];
   if (expectedBranch && resolved.branch !== expectedBranch) {
     fail(
-      `environments.${name}.branch is '${resolved.branch}' but the promotion model binds it to '${expectedBranch}'.`,
+      `environments.${name}.branch is '${resolved.branch}' but the main-only deployment model binds it to '${expectedBranch}'.`,
     );
   }
 

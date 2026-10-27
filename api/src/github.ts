@@ -69,7 +69,7 @@ export async function dispatchWorkflow(
   repository: string,
   workflow: string,
   inputs: Readonly<Record<string, string>>,
-  ref: "dev" | "main" = "dev",
+  ref: "main" = "main",
 ): Promise<void> {
   const { owner, repo, token } = await installationToken(configuration, repository, true);
   await boundedRequest(
@@ -131,7 +131,7 @@ export function verifyDispatchAccess(configuration: GitHubAppConfiguration, repo
   });
 }
 
-export async function workflowObservation(repository: string, workflow: string, ref: "dev" | "main"): Promise<WorkflowObservation> {
+export async function workflowObservation(repository: string, workflow: string, ref: "main"): Promise<WorkflowObservation> {
   const configuration = githubConfiguration();
   if (!configuration) return {
     state: "not-configured", source: "GitHub App · Actions", observedAt: new Date().toISOString(), runs: [],
@@ -157,7 +157,7 @@ export async function workflowObservation(repository: string, workflow: string, 
           url: `https://github.com/${repository}/actions/runs/${run.id}`,
         }];
       });
-      return { ...base, state: "observed", runs, message: runs.length ? "Workflow results, not live application health." : "No matching workflow run was found." };
+      return { ...base, state: "observed", runs, message: runs.length ? "Main-branch workflow results may include dev and prod; they are not live application health." : "No matching main-branch workflow run was found." };
     } catch (error) {
       return {
         ...base, state: githubFailureState(error),

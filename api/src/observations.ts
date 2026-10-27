@@ -99,7 +99,7 @@ async function serviceObservation(service: ServiceDefinition, environment: Envir
     Promise.all(resources.map(availability)),
     Promise.all((service.zones ?? []).map(dnsObservation)),
     service.repository && service.statusWorkflow
-      ? workflowObservation(service.repository, service.statusWorkflow, environment === "prod" ? "main" : "dev")
+      ? workflowObservation(service.repository, service.statusWorkflow, "main")
       : Promise.resolve(null),
     service.kind === "easm" ? budgetObservation(binding) : Promise.resolve(null),
   ]);

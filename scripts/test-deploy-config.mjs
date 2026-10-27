@@ -56,7 +56,7 @@ function baseConfig(overrides = {}) {
     },
     environments: {
       dev: {
-        branch: "dev",
+        branch: "main",
         githubEnvironment: "dev",
         location: "centralus",
         resourceGroup: "NP-Example-Dev-CentralUS",
@@ -80,6 +80,14 @@ function baseConfig(overrides = {}) {
 }
 
 const rejects = [
+  ...["dev", "feature/unreviewed"].map((branch) => ({
+    name: `rejects source branch ${branch} even with an explicit environment`,
+    args: () => [
+      "--branch", branch, "--environment", "dev",
+      "--config", writeConfig(`source-${branch.replaceAll("/", "-")}.json`, baseConfig()),
+    ],
+    expect: /Deploy from 'main'/,
+  })),
   {
     name: "rejects a subscription id committed to config",
     args: () => [
@@ -123,7 +131,7 @@ const rejects = [
         }),
       ),
     ],
-    expect: /promotion model binds it to 'main'/i,
+    expect: /main-only deployment model binds it to 'main'/i,
   },
   {
     name: "rejects a public site url that contradicts the custom domain",
@@ -347,6 +355,17 @@ accepts(
     stdout.includes("DEPLOY_ENVIRONMENT=prod")
       ? null
       : "expected DEPLOY_ENVIRONMENT=prod",
+);
+
+accepts(
+  "selects dev explicitly from main without changing its resource scope",
+  ["--branch", "main", "--environment", "dev", "--config", healthy],
+  {},
+  (stdout) =>
+    stdout.includes("DEPLOY_ENVIRONMENT=dev") &&
+    stdout.includes("AZURE_RESOURCE_GROUP=NP-Example-Dev-CentralUS")
+      ? null
+      : "expected the explicitly selected dev environment and resource group",
 );
 
 accepts(

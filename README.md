@@ -114,12 +114,13 @@ provide them through GitHub Environment variables or a runtime override.
 ```bash
 node scripts/pawprint-config.mjs --environment dev
 node scripts/pawprint-config.mjs --environment dev --check
-node scripts/pawprint-config.mjs --branch dev --github-env
+node scripts/pawprint-config.mjs --branch main --environment dev --github-env
 ```
 
 Committed configuration is schema-validated and fails closed. Secret-shaped
 values are rejected, subscriptions must be explicitly approved, and
-environment branches are isolated (`dev` to `dev`, `prod` to `main`). Runtime
+`main` is the only persistent branch. Both deployment environments use `main`;
+select `dev` explicitly, while branch-only auto-detection selects `prod`. Runtime
 secrets belong in Azure Key Vault. Pipeline identity belongs in GitHub
 Environment variables, not repository files or long-lived client secrets.
 
@@ -692,14 +693,14 @@ platform/org.bicep --parameters platform/org.<env>.bicepparam`. Shared
 3. **Per repository and environment.** `npm run onboard -- --repo <org/repo>
 --environment <env> --subscription <id> --resource-group <rg>`. Creates the
    application, the federated credential, the role assignments and the
-   variables, and binds the environment to its branch. Defaults to a dry run.
+   variables, and restricts the environment to `main`. Defaults to a dry run.
 4. **The DevOps connector**, once for the organisation, interactively. See
    above; this is the one step that cannot be scripted.
 
 Re-run the status command after each step. A green dev environment looks like
 every repository having an application, a credential whose subject matches what
 GitHub actually emits, roles on its own resource group, and an environment
-restricted to its branch.
+restricted to `main`.
 
 ## CI and adoption
 
@@ -726,8 +727,9 @@ jobs:
 ```
 
 Use `check-committed-arm` whenever generated ARM templates are committed.
-Promotion is intentionally pull-request based and should require successful CI
-before `dev` is promoted to `main`.
+Merge reviewed changes directly into `main` after successful CI. There is no
+permanent `dev` branch or dev-to-main promotion step. Select a deployment
+environment independently, keeping its existing approvals, identity and scope.
 
 ## Design commitments
 

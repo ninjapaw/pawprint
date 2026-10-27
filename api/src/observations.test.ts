@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { armJson, SourceError } from "./azure.js";
 import { sharedOverview } from "./observations.js";
+import { workflowObservation } from "./github.js";
 
 vi.mock("./azure.js", async (original) => ({
   ...await original<typeof import("./azure.js")>(), armJson: vi.fn(),
@@ -22,6 +23,7 @@ describe("honest shared-service observations", () => {
     const services = await sharedOverview("dev");
     const service = services.find((item) => item.id === "m365profiles");
     expect(service?.workflow?.runs[0]?.conclusion).toBe("success");
+    expect(workflowObservation).toHaveBeenCalledWith("ninjapaw/m365profiles", "deploy.yml", "main");
     expect(service?.health.state).toBe("unknown");
     expect(service?.provisioning[0]?.state).toBe("not-configured");
     expect(armJson).not.toHaveBeenCalled();

@@ -88,7 +88,7 @@ test("portal preview CLI fails explicitly without disclosing malformed report co
 test("preview-only workflow has no infrastructure or code publication path", () => {
   const workflow = readFileSync(new URL("../.github/workflows/deploy-portal-api.yml", import.meta.url), "utf8");
   assert.match(workflow, /preview-only:/);
-  assert.match(workflow, /\n  deploy:\n    if: github\.ref == 'refs\/heads\/dev'/);
+  assert.match(workflow, /\n  deploy:\n    if: github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /az deployment group what-if/);
   assert.match(workflow, /node scripts\/check-portal-preview\.mjs/);
   assert.match(workflow, /template="\$RUNNER_TEMP\/pawprint-portal-template\.json"/);

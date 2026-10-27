@@ -77,8 +77,8 @@ jobs:
             plan|validate) ;;
             *)
               case "$EASM_SOURCE_REF:$EASM_TARGET_ENVIRONMENT" in
-                main:prod|dev:dev) ;;
-                *) echo "::error::Cloud operations require main/prod or dev/dev."; exit 1 ;;
+                main:prod|main:dev) ;;
+                *) echo "::error::Cloud operations require main and an explicit dev/prod environment."; exit 1 ;;
               esac
               ;;
           esac

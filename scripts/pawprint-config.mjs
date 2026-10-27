@@ -10,7 +10,7 @@
  *
  * Usage:
  *   node scripts/pawprint-config.mjs --environment dev
- *   node scripts/pawprint-config.mjs --branch dev --github-env
+ *   node scripts/pawprint-config.mjs --branch main --environment dev --github-env
  *   node scripts/pawprint-config.mjs --environment prod --check
  *   node scripts/pawprint-config.mjs --environment dev --json
  */
@@ -120,6 +120,9 @@ function validateFile(validate, config, label) {
 }
 
 function environmentFromBranch(config, branch) {
+  if (branch === "main" && config.environments?.prod?.branch === branch) {
+    return "prod";
+  }
   const match = Object.entries(config.environments ?? {}).find(
     ([, settings]) => settings.branch === branch,
   );

@@ -103,7 +103,7 @@ describe("durable bounded EASM requests", () => {
     expect(dispatchWorkflow).toHaveBeenCalledTimes(1);
     expect(dispatchWorkflow).toHaveBeenCalledWith(expect.anything(), "ninjapaw/pawprint", "shared-easm.yml", {
       environment: "dev", operation: "verify", request_id: value.requestId, approve_write: "false", approve_discovery: "false",
-    }, "dev");
+    }, "main");
   });
   it("returns persisted uncertainty after a crashed requesting state without re-dispatch", async () => {
     const store = new SharedDurableFixture();
@@ -154,7 +154,7 @@ describe("durable bounded EASM requests", () => {
     await confirmRequest(store, principal, "admin", value.requestId, { ...confirmation, approveWrite: true, approveDiscovery: true });
     expect(dispatchWorkflow).toHaveBeenCalledWith(expect.anything(), "ninjapaw/pawprint", "shared-easm.yml", {
       environment: "dev", operation: "run-discovery", request_id: value.requestId, approve_write: "true", approve_discovery: "true",
-    }, "dev");
+    }, "main");
   });
   it("rejects expired previews, different operators and invalid durable records", async () => {
     const store = new SharedDurableFixture();
@@ -179,6 +179,6 @@ describe("durable bounded EASM requests", () => {
     const status = await requestStatus(store, principal, value.requestId);
     expect(status.workflow.runs).toHaveLength(1);
     expect(status.state).toBe("accepted");
-    expect(workflowObservation).toHaveBeenCalledWith("ninjapaw/pawprint", "shared-easm.yml", "dev");
+    expect(workflowObservation).toHaveBeenCalledWith("ninjapaw/pawprint", "shared-easm.yml", "main");
   });
 });

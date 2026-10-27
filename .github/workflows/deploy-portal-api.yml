@@ -2,7 +2,7 @@ name: Deploy Pawprint Portal API
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - .github/workflows/deploy-portal-api.yml
       - api/**
@@ -78,7 +78,7 @@ jobs:
           retention-days: 1
 
   deploy:
-    if: github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 20
